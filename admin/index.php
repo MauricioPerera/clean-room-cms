@@ -57,6 +57,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'settings':
             cr_admin_save_settings();
             break;
+        case 'term-edit':
+            cr_admin_save_term();
+            break;
+    }
+}
+
+// Handle term delete
+if ($admin_action === 'delete' && ($page === 'categories' || $page === 'tags')) {
+    $term_id = (int) ($_GET['id'] ?? 0);
+    $taxonomy = $page === 'categories' ? 'category' : 'post_tag';
+    if ($term_id && current_user_can('manage_categories')) {
+        cr_delete_term($term_id, $taxonomy);
+        header('Location: ' . CR_SITE_URL . "/admin/?page={$page}&msg=deleted");
+        exit;
     }
 }
 
@@ -78,11 +92,14 @@ function cr_admin_page(string $page): void {
     cr_admin_header($page);
 
     match ($page) {
-        'posts'     => cr_admin_posts_list('post'),
-        'pages'     => cr_admin_posts_list('page'),
-        'post-edit' => cr_admin_post_edit(),
-        'settings'  => cr_admin_settings(),
-        default     => cr_admin_dashboard(),
+        'posts'      => cr_admin_posts_list('post'),
+        'pages'      => cr_admin_posts_list('page'),
+        'post-edit'  => cr_admin_post_edit(),
+        'categories' => cr_admin_taxonomy_list('category'),
+        'tags'       => cr_admin_taxonomy_list('post_tag'),
+        'term-edit'  => cr_admin_term_edit(),
+        'settings'   => cr_admin_settings(),
+        default      => cr_admin_dashboard(),
     };
 
     cr_admin_footer();
@@ -108,6 +125,8 @@ function cr_admin_header(string $current_page): void {
         <nav class="admin-nav">
             <a href="?page=dashboard" class="<?php echo $current_page === 'dashboard' ? 'active' : ''; ?>">Dashboard</a>
             <a href="?page=posts" class="<?php echo $current_page === 'posts' ? 'active' : ''; ?>">Posts</a>
+            <a href="?page=categories" class="<?php echo $current_page === 'categories' ? 'active' : ''; ?> sub">Categories</a>
+            <a href="?page=tags" class="<?php echo $current_page === 'tags' ? 'active' : ''; ?> sub">Tags</a>
             <a href="?page=pages" class="<?php echo $current_page === 'pages' ? 'active' : ''; ?>">Pages</a>
             <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
         </nav>
@@ -305,6 +324,38 @@ function cr_admin_post_edit(): void {
             </div>
         </div>
 
+        <?php if ($post_type === 'post'):
+            // Category checkboxes
+            $all_cats = get_terms(['taxonomy' => 'category', 'hide_empty' => false, 'orderby' => 'name']);
+            $post_cats = $post ? array_map(fn($t) => (int) $t->term_id, get_the_terms((int) $post->ID, 'category')) : [];
+        ?>
+        <div class="form-group">
+            <label>Categories</label>
+            <div class="checkbox-list">
+                <?php foreach ($all_cats as $cat): ?>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="post_categories[]" value="<?php echo $cat->term_id; ?>"
+                            <?php echo in_array((int) $cat->term_id, $post_cats) ? 'checked' : ''; ?>>
+                        <?php echo esc_html($cat->name); ?>
+                    </label>
+                <?php endforeach; ?>
+                <?php if (empty($all_cats)): ?>
+                    <p class="text-muted">No categories yet. <a href="?page=term-edit&taxonomy=category">Create one</a></p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php
+            // Tags input
+            $post_tags = $post ? get_the_terms((int) $post->ID, 'post_tag') : [];
+            $tag_names = !empty($post_tags) ? implode(', ', array_map(fn($t) => $t->name, $post_tags)) : '';
+        ?>
+        <div class="form-group">
+            <label for="post_tags">Tags</label>
+            <input type="text" id="post_tags" name="post_tags" value="<?php echo esc_attr($tag_names); ?>" class="input-full" placeholder="tag1, tag2, tag3 (comma separated)">
+        </div>
+        <?php endif; ?>
+
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">
                 <?php echo $post ? "Update {$label}" : "Publish {$label}"; ?>
@@ -332,6 +383,23 @@ function cr_admin_save_post(): void {
         cr_update_post($data);
     } else {
         $post_id = cr_insert_post($data);
+    }
+
+    // Save categories (for posts)
+    if ($data['post_type'] === 'post' && $post_id) {
+        $categories = $_POST['post_categories'] ?? [];
+        $cat_ids = array_map('intval', $categories);
+        cr_set_post_terms($post_id, $cat_ids, 'category');
+
+        // Save tags (comma separated)
+        $tags_input = trim($_POST['post_tags'] ?? '');
+        if (!empty($tags_input)) {
+            $tag_names = array_map('trim', explode(',', $tags_input));
+            $tag_names = array_filter($tag_names, fn($t) => !empty($t));
+            cr_set_post_terms($post_id, $tag_names, 'post_tag');
+        } else {
+            cr_set_post_terms($post_id, [], 'post_tag');
+        }
     }
 
     $list_page = $data['post_type'] === 'page' ? 'pages' : 'posts';
@@ -390,6 +458,181 @@ function cr_admin_save_settings(): void {
 function sanitize_text_field(string $str): string {
     return htmlspecialchars(strip_tags(trim($str)), ENT_QUOTES, 'UTF-8');
 }
+
+// ==========================================
+// Taxonomy Management
+// ==========================================
+
+function cr_admin_taxonomy_list(string $taxonomy): void {
+    $db = cr_db();
+    $label = $taxonomy === 'category' ? 'Categories' : 'Tags';
+    $page_slug = $taxonomy === 'category' ? 'categories' : 'tags';
+    $is_hierarchical = $taxonomy === 'category';
+
+    $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
+
+    $msg = $_GET['msg'] ?? '';
+?>
+    <div class="admin-header">
+        <h1><?php echo $label; ?></h1>
+        <a href="?page=term-edit&taxonomy=<?php echo esc_attr($taxonomy); ?>" class="btn btn-primary">Add New</a>
+    </div>
+
+    <?php if ($msg === 'deleted'): ?>
+        <div class="admin-notice success">Term deleted.</div>
+    <?php elseif ($msg === 'saved'): ?>
+        <div class="admin-notice success">Term saved.</div>
+    <?php endif; ?>
+
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Slug</th>
+                <?php if ($is_hierarchical): ?><th>Parent</th><?php endif; ?>
+                <th>Count</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($terms as $term): ?>
+            <tr>
+                <td><strong><a href="?page=term-edit&taxonomy=<?php echo esc_attr($taxonomy); ?>&id=<?php echo $term->term_id; ?>"><?php echo esc_html($term->name); ?></a></strong></td>
+                <td><code><?php echo esc_html($term->slug); ?></code></td>
+                <?php if ($is_hierarchical): ?>
+                    <td>
+                        <?php
+                        if ((int) $term->parent > 0) {
+                            $parent = get_term((int) $term->parent, $taxonomy);
+                            echo $parent ? esc_html($parent->name) : '-';
+                        } else {
+                            echo '-';
+                        }
+                        ?>
+                    </td>
+                <?php endif; ?>
+                <td><?php echo (int) $term->count; ?></td>
+                <td>
+                    <a href="?page=term-edit&taxonomy=<?php echo esc_attr($taxonomy); ?>&id=<?php echo $term->term_id; ?>">Edit</a>
+                    <?php if ($term->slug !== 'uncategorized'): ?>
+                        <a href="?page=<?php echo $page_slug; ?>&action=delete&id=<?php echo $term->term_id; ?>" class="text-danger" onclick="return confirm('Delete this term?')">Delete</a>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (empty($terms)): ?>
+            <tr><td colspan="<?php echo $is_hierarchical ? 5 : 4; ?>">No <?php echo strtolower($label); ?> found.</td></tr>
+        <?php endif; ?>
+        </tbody>
+    </table>
+<?php
+}
+
+function cr_admin_term_edit(): void {
+    $taxonomy = $_GET['taxonomy'] ?? 'category';
+    $term_id = (int) ($_GET['id'] ?? 0);
+    $is_hierarchical = $taxonomy === 'category';
+    $label = $taxonomy === 'category' ? 'Category' : 'Tag';
+    $page_slug = $taxonomy === 'category' ? 'categories' : 'tags';
+
+    $term = null;
+    if ($term_id) {
+        $term = get_term($term_id, $taxonomy);
+    }
+
+    // Get all terms for parent dropdown (hierarchical only)
+    $all_terms = [];
+    if ($is_hierarchical) {
+        $all_terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false, 'orderby' => 'name']);
+    }
+?>
+    <div class="admin-header">
+        <h1><?php echo $term ? "Edit {$label}" : "New {$label}"; ?></h1>
+    </div>
+
+    <form method="post" action="?page=term-edit&taxonomy=<?php echo esc_attr($taxonomy); ?><?php echo $term ? '&id=' . $term->term_id : ''; ?>">
+        <input type="hidden" name="_cr_nonce" value="<?php echo cr_create_nonce('admin_action'); ?>">
+        <input type="hidden" name="taxonomy" value="<?php echo esc_attr($taxonomy); ?>">
+        <?php if ($term): ?>
+            <input type="hidden" name="term_id" value="<?php echo $term->term_id; ?>">
+        <?php endif; ?>
+
+        <div class="form-group">
+            <label for="term_name">Name</label>
+            <input type="text" id="term_name" name="term_name" value="<?php echo esc_attr($term->name ?? ''); ?>" class="input-full" placeholder="Term name" required autofocus>
+        </div>
+
+        <div class="form-group">
+            <label for="term_slug">Slug</label>
+            <input type="text" id="term_slug" name="term_slug" value="<?php echo esc_attr($term->slug ?? ''); ?>" class="input-full" placeholder="auto-generated-from-name">
+        </div>
+
+        <?php if ($is_hierarchical): ?>
+        <div class="form-group">
+            <label for="term_parent">Parent</label>
+            <select id="term_parent" name="term_parent">
+                <option value="0">None (top level)</option>
+                <?php foreach ($all_terms as $t):
+                    if ($term && (int) $t->term_id === $term_id) continue; // Can't be own parent
+                ?>
+                    <option value="<?php echo $t->term_id; ?>" <?php echo ($term && (int) $term->parent === (int) $t->term_id) ? 'selected' : ''; ?>>
+                        <?php echo esc_html($t->name); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
+
+        <div class="form-group">
+            <label for="term_description">Description</label>
+            <textarea id="term_description" name="term_description" rows="4" class="input-full"><?php echo esc_html($term->description ?? ''); ?></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <?php echo $term ? "Update {$label}" : "Add {$label}"; ?>
+            </button>
+            <a href="?page=<?php echo $page_slug; ?>" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+<?php
+}
+
+function cr_admin_save_term(): void {
+    $taxonomy = $_POST['taxonomy'] ?? 'category';
+    $term_id = (int) ($_POST['term_id'] ?? 0);
+    $name = trim($_POST['term_name'] ?? '');
+    $slug = trim($_POST['term_slug'] ?? '');
+    $parent = (int) ($_POST['term_parent'] ?? 0);
+    $description = trim($_POST['term_description'] ?? '');
+    $page_slug = $taxonomy === 'category' ? 'categories' : 'tags';
+
+    if (empty($name)) {
+        header('Location: ' . CR_SITE_URL . "/admin/?page={$page_slug}&msg=error");
+        exit;
+    }
+
+    if ($term_id) {
+        // Update existing term
+        $args = ['name' => $name, 'description' => $description];
+        if (!empty($slug)) $args['slug'] = $slug;
+        if ($taxonomy === 'category') $args['parent'] = $parent;
+        cr_update_term($term_id, $taxonomy, $args);
+    } else {
+        // Create new term
+        $args = ['description' => $description];
+        if (!empty($slug)) $args['slug'] = $slug;
+        if ($taxonomy === 'category') $args['parent'] = $parent;
+        cr_insert_term($name, $taxonomy, $args);
+    }
+
+    header('Location: ' . CR_SITE_URL . "/admin/?page={$page_slug}&msg=saved");
+    exit;
+}
+
+// ==========================================
+// Taxonomy assignment in post editor
+// ==========================================
 
 function cr_admin_login_page(string $error = ''): void {
 ?>

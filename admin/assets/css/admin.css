@@ -252,6 +252,40 @@ select {
 .admin-notice.success { background: #edf7ed; border-color: var(--color-success); }
 .admin-notice.error { background: #fcf0f1; border-color: var(--color-danger); }
 
+/* Sidebar submenu items */
+.admin-nav a.sub {
+    padding-left: 36px;
+    font-size: .88em;
+    opacity: .8;
+}
+.admin-nav a.sub:hover,
+.admin-nav a.sub.active { opacity: 1; }
+
+/* Checkbox lists (taxonomy assignment) */
+.checkbox-list {
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: #fff;
+}
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    font-weight: 400;
+    font-size: .9em;
+    cursor: pointer;
+}
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.text-muted { color: var(--color-text-light); font-size: .9em; }
+
 /* Responsive */
 @media (max-width: 960px) {
     .admin-sidebar { width: 60px; }
