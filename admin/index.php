@@ -1,0 +1,438 @@
+<?php
+/**
+ * Clean Room CMS - Admin Panel
+ */
+
+// Auth check
+if (!is_user_logged_in()) {
+    $action = $_GET['action'] ?? '';
+
+    if ($action === 'login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        // Brute force protection
+        if (CR_Security::is_login_locked()) {
+            $login_error = 'Too many failed attempts. Please wait 30 minutes.';
+        } else {
+            $user_id = cr_authenticate($_POST['log'] ?? '', $_POST['pwd'] ?? '');
+            if ($user_id) {
+                CR_Security::clear_failed_logins();
+                cr_set_auth_cookie($user_id);
+                header('Location: ' . CR_SITE_URL . '/admin/');
+                exit;
+            }
+            CR_Security::record_failed_login($_POST['log'] ?? '');
+            $login_error = 'Invalid username or password.';
+        }
+    }
+
+    // Show login form
+    cr_admin_login_page($login_error ?? '');
+    exit;
+}
+
+if (!current_user_can('read')) {
+    die('Access denied.');
+}
+
+// Handle logout
+if (($_GET['action'] ?? '') === 'logout') {
+    cr_clear_auth_cookie();
+    header('Location: ' . CR_SITE_URL . '/admin/?action=login');
+    exit;
+}
+
+// Route admin pages
+$page = $_GET['page'] ?? 'dashboard';
+$admin_action = $_GET['action'] ?? '';
+
+// Handle form submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!cr_verify_nonce($_POST['_cr_nonce'] ?? '', 'admin_action')) {
+        die('Security check failed.');
+    }
+
+    switch ($page) {
+        case 'post-edit':
+            cr_admin_save_post();
+            break;
+        case 'settings':
+            cr_admin_save_settings();
+            break;
+    }
+}
+
+// Handle delete
+if ($admin_action === 'delete' && $page === 'posts') {
+    $post_id = (int) ($_GET['id'] ?? 0);
+    if ($post_id && current_user_can('delete_posts')) {
+        cr_delete_post($post_id, true);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=posts&msg=deleted');
+        exit;
+    }
+}
+
+cr_admin_page($page);
+
+// -- Admin functions --
+
+function cr_admin_page(string $page): void {
+    cr_admin_header($page);
+
+    match ($page) {
+        'posts'     => cr_admin_posts_list('post'),
+        'pages'     => cr_admin_posts_list('page'),
+        'post-edit' => cr_admin_post_edit(),
+        'settings'  => cr_admin_settings(),
+        default     => cr_admin_dashboard(),
+    };
+
+    cr_admin_footer();
+}
+
+function cr_admin_header(string $current_page): void {
+    $user = cr_get_current_user();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - <?php bloginfo('name'); ?></title>
+    <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/admin.css">
+</head>
+<body class="admin">
+<div class="admin-layout">
+    <aside class="admin-sidebar">
+        <div class="admin-logo">
+            <a href="<?php echo esc_url(CR_SITE_URL); ?>/admin/">CR</a>
+        </div>
+        <nav class="admin-nav">
+            <a href="?page=dashboard" class="<?php echo $current_page === 'dashboard' ? 'active' : ''; ?>">Dashboard</a>
+            <a href="?page=posts" class="<?php echo $current_page === 'posts' ? 'active' : ''; ?>">Posts</a>
+            <a href="?page=pages" class="<?php echo $current_page === 'pages' ? 'active' : ''; ?>">Pages</a>
+            <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
+        </nav>
+        <div class="admin-user">
+            <span><?php echo esc_html($user->display_name); ?></span>
+            <a href="?action=logout">Logout</a>
+        </div>
+    </aside>
+    <main class="admin-main">
+<?php
+}
+
+function cr_admin_footer(): void {
+?>
+    </main>
+</div>
+</body>
+</html>
+<?php
+}
+
+function cr_admin_dashboard(): void {
+    $db = cr_db();
+    $post_count = (int) $db->get_var("SELECT COUNT(*) FROM `{$db->prefix}posts` WHERE post_type='post' AND post_status='publish'");
+    $page_count = (int) $db->get_var("SELECT COUNT(*) FROM `{$db->prefix}posts` WHERE post_type='page' AND post_status='publish'");
+    $comment_count = (int) $db->get_var("SELECT COUNT(*) FROM `{$db->prefix}comments`");
+    $user_count = (int) $db->get_var("SELECT COUNT(*) FROM `{$db->prefix}users`");
+?>
+    <div class="admin-header">
+        <h1>Dashboard</h1>
+    </div>
+    <div class="dashboard-cards">
+        <div class="card">
+            <div class="card-number"><?php echo $post_count; ?></div>
+            <div class="card-label">Posts</div>
+        </div>
+        <div class="card">
+            <div class="card-number"><?php echo $page_count; ?></div>
+            <div class="card-label">Pages</div>
+        </div>
+        <div class="card">
+            <div class="card-number"><?php echo $comment_count; ?></div>
+            <div class="card-label">Comments</div>
+        </div>
+        <div class="card">
+            <div class="card-number"><?php echo $user_count; ?></div>
+            <div class="card-label">Users</div>
+        </div>
+    </div>
+
+    <div class="admin-section">
+        <h2>Recent Posts</h2>
+        <?php
+        $recent = $db->get_results("SELECT ID, post_title, post_date, post_status FROM `{$db->prefix}posts` WHERE post_type='post' ORDER BY post_date DESC LIMIT 5");
+        if ($recent): ?>
+        <table class="admin-table">
+            <thead><tr><th>Title</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+            <?php foreach ($recent as $p): ?>
+                <tr>
+                    <td><a href="?page=post-edit&id=<?php echo $p->ID; ?>"><?php echo esc_html($p->post_title); ?></a></td>
+                    <td><?php echo date('M j, Y', strtotime($p->post_date)); ?></td>
+                    <td><span class="status-badge status-<?php echo esc_attr($p->post_status); ?>"><?php echo esc_html($p->post_status); ?></span></td>
+                    <td><a href="?page=post-edit&id=<?php echo $p->ID; ?>">Edit</a></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+            <p>No posts yet. <a href="?page=post-edit&type=post">Create your first post</a></p>
+        <?php endif; ?>
+    </div>
+<?php
+}
+
+function cr_admin_posts_list(string $post_type): void {
+    $db = cr_db();
+    $label = $post_type === 'page' ? 'Pages' : 'Posts';
+
+    $paged = max(1, (int) ($_GET['paged'] ?? 1));
+    $per_page = 20;
+    $offset = ($paged - 1) * $per_page;
+
+    $total = (int) $db->get_var($db->prepare(
+        "SELECT COUNT(*) FROM `{$db->prefix}posts` WHERE post_type = %s AND post_status != 'auto-draft'", $post_type
+    ));
+    $posts = $db->get_results($db->prepare(
+        "SELECT ID, post_title, post_date, post_status, post_author FROM `{$db->prefix}posts` WHERE post_type = %s AND post_status != 'auto-draft' ORDER BY post_date DESC LIMIT %d OFFSET %d",
+        $post_type, $per_page, $offset
+    ));
+
+    $msg = $_GET['msg'] ?? '';
+?>
+    <div class="admin-header">
+        <h1><?php echo $label; ?></h1>
+        <a href="?page=post-edit&type=<?php echo esc_attr($post_type); ?>" class="btn btn-primary">Add New</a>
+    </div>
+
+    <?php if ($msg === 'deleted'): ?>
+        <div class="admin-notice success">Post deleted.</div>
+    <?php elseif ($msg === 'saved'): ?>
+        <div class="admin-notice success">Post saved.</div>
+    <?php endif; ?>
+
+    <table class="admin-table">
+        <thead>
+            <tr><th>Title</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+        <?php foreach ($posts as $p): ?>
+            <tr>
+                <td><strong><a href="?page=post-edit&id=<?php echo $p->ID; ?>"><?php echo esc_html($p->post_title ?: '(no title)'); ?></a></strong></td>
+                <td><?php echo date('Y-m-d', strtotime($p->post_date)); ?></td>
+                <td><span class="status-badge status-<?php echo esc_attr($p->post_status); ?>"><?php echo esc_html($p->post_status); ?></span></td>
+                <td>
+                    <a href="?page=post-edit&id=<?php echo $p->ID; ?>">Edit</a>
+                    <a href="<?php echo esc_url(get_permalink($p->ID)); ?>" target="_blank">View</a>
+                    <a href="?page=posts&action=delete&id=<?php echo $p->ID; ?>" class="text-danger" onclick="return confirm('Delete this post?')">Delete</a>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (empty($posts)): ?>
+            <tr><td colspan="4">No <?php echo strtolower($label); ?> found.</td></tr>
+        <?php endif; ?>
+        </tbody>
+    </table>
+
+    <?php
+    $max_pages = ceil($total / $per_page);
+    if ($max_pages > 1): ?>
+        <div class="pagination" style="margin-top:16px;">
+            <?php for ($i = 1; $i <= $max_pages; $i++): ?>
+                <?php if ($i === $paged): ?>
+                    <strong><?php echo $i; ?></strong>
+                <?php else: ?>
+                    <a href="?page=<?php echo $post_type === 'page' ? 'pages' : 'posts'; ?>&paged=<?php echo $i; ?>"><?php echo $i; ?></a>
+                <?php endif; ?>
+            <?php endfor; ?>
+        </div>
+    <?php endif; ?>
+<?php
+}
+
+function cr_admin_post_edit(): void {
+    $post_id = (int) ($_GET['id'] ?? 0);
+    $post_type = $_GET['type'] ?? 'post';
+
+    $post = null;
+    if ($post_id) {
+        $post = get_post($post_id);
+        if ($post) $post_type = $post->post_type;
+    }
+
+    $label = $post_type === 'page' ? 'Page' : 'Post';
+?>
+    <div class="admin-header">
+        <h1><?php echo $post ? "Edit {$label}" : "New {$label}"; ?></h1>
+    </div>
+
+    <form method="post" action="?page=post-edit<?php echo $post ? '&id=' . $post->ID : ''; ?>">
+        <input type="hidden" name="_cr_nonce" value="<?php echo cr_create_nonce('admin_action'); ?>">
+        <input type="hidden" name="post_type" value="<?php echo esc_attr($post_type); ?>">
+        <?php if ($post): ?>
+            <input type="hidden" name="post_id" value="<?php echo $post->ID; ?>">
+        <?php endif; ?>
+
+        <div class="form-group">
+            <label for="post_title">Title</label>
+            <input type="text" id="post_title" name="post_title" value="<?php echo esc_attr($post->post_title ?? ''); ?>" class="input-full" placeholder="Enter title here" autofocus>
+        </div>
+
+        <div class="form-group">
+            <label for="post_name">Slug</label>
+            <input type="text" id="post_name" name="post_name" value="<?php echo esc_attr($post->post_name ?? ''); ?>" class="input-full" placeholder="auto-generated-from-title">
+        </div>
+
+        <div class="form-group">
+            <label for="post_content">Content</label>
+            <textarea id="post_content" name="post_content" rows="18" class="input-full"><?php echo esc_html($post->post_content ?? ''); ?></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="post_excerpt">Excerpt</label>
+            <textarea id="post_excerpt" name="post_excerpt" rows="3" class="input-full"><?php echo esc_html($post->post_excerpt ?? ''); ?></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="post_status">Status</label>
+                <select id="post_status" name="post_status">
+                    <?php foreach (['draft', 'publish', 'pending', 'private'] as $status): ?>
+                        <option value="<?php echo $status; ?>" <?php echo ($post->post_status ?? 'draft') === $status ? 'selected' : ''; ?>><?php echo ucfirst($status); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <?php echo $post ? "Update {$label}" : "Publish {$label}"; ?>
+            </button>
+            <a href="?page=<?php echo $post_type === 'page' ? 'pages' : 'posts'; ?>" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+<?php
+}
+
+function cr_admin_save_post(): void {
+    $post_id = (int) ($_POST['post_id'] ?? 0);
+    $data = [
+        'post_title'   => $_POST['post_title'] ?? '',
+        'post_name'    => $_POST['post_name'] ?? '',
+        'post_content' => $_POST['post_content'] ?? '',
+        'post_excerpt' => $_POST['post_excerpt'] ?? '',
+        'post_status'  => $_POST['post_status'] ?? 'draft',
+        'post_type'    => $_POST['post_type'] ?? 'post',
+        'post_author'  => get_current_user_id(),
+    ];
+
+    if ($post_id) {
+        $data['ID'] = $post_id;
+        cr_update_post($data);
+    } else {
+        $post_id = cr_insert_post($data);
+    }
+
+    $list_page = $data['post_type'] === 'page' ? 'pages' : 'posts';
+    header('Location: ' . CR_SITE_URL . "/admin/?page={$list_page}&msg=saved");
+    exit;
+}
+
+function cr_admin_settings(): void {
+?>
+    <div class="admin-header">
+        <h1>Settings</h1>
+    </div>
+
+    <form method="post" action="?page=settings">
+        <input type="hidden" name="_cr_nonce" value="<?php echo cr_create_nonce('admin_action'); ?>">
+
+        <div class="form-group">
+            <label for="blogname">Site Title</label>
+            <input type="text" id="blogname" name="blogname" value="<?php echo esc_attr(get_option('blogname')); ?>" class="input-full">
+        </div>
+
+        <div class="form-group">
+            <label for="blogdescription">Tagline</label>
+            <input type="text" id="blogdescription" name="blogdescription" value="<?php echo esc_attr(get_option('blogdescription')); ?>" class="input-full">
+        </div>
+
+        <div class="form-group">
+            <label for="admin_email">Admin Email</label>
+            <input type="email" id="admin_email" name="admin_email" value="<?php echo esc_attr(get_option('admin_email')); ?>" class="input-full">
+        </div>
+
+        <div class="form-group">
+            <label for="posts_per_page">Posts per page</label>
+            <input type="number" id="posts_per_page" name="posts_per_page" value="<?php echo esc_attr(get_option('posts_per_page', '10')); ?>" min="1" max="100" style="width:100px;">
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+        </div>
+    </form>
+<?php
+}
+
+function cr_admin_save_settings(): void {
+    $fields = ['blogname', 'blogdescription', 'admin_email', 'posts_per_page'];
+    foreach ($fields as $field) {
+        if (isset($_POST[$field])) {
+            update_option($field, sanitize_text_field($_POST[$field]));
+        }
+    }
+
+    header('Location: ' . CR_SITE_URL . '/admin/?page=settings&msg=saved');
+    exit;
+}
+
+function sanitize_text_field(string $str): string {
+    return htmlspecialchars(strip_tags(trim($str)), ENT_QUOTES, 'UTF-8');
+}
+
+function cr_admin_login_page(string $error = ''): void {
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - <?php echo esc_html(get_option('blogname', 'Clean Room CMS')); ?></title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f0f1; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-box { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); width: 360px; }
+        .login-logo { text-align: center; font-size: 2em; font-weight: 700; margin-bottom: 24px; color: #1d2327; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-weight: 600; margin-bottom: 4px; font-size: .9em; }
+        input { width: 100%; padding: 10px; border: 1px solid #8c8f94; border-radius: 4px; font-size: 1em; }
+        input:focus { border-color: #2271b1; outline: none; box-shadow: 0 0 0 1px #2271b1; }
+        .btn { width: 100%; padding: 12px; background: #2271b1; color: #fff; border: none; border-radius: 4px; font-size: 1em; cursor: pointer; }
+        .btn:hover { background: #135e96; }
+        .error { background: #fcf0f1; border-left: 4px solid #d63638; padding: 10px 14px; margin-bottom: 16px; border-radius: 0 4px 4px 0; font-size: .9em; }
+        .back-link { text-align: center; margin-top: 16px; }
+        .back-link a { color: #2271b1; text-decoration: none; font-size: .9em; }
+    </style>
+</head>
+<body>
+<div class="login-box">
+    <div class="login-logo">CR</div>
+    <?php if ($error): ?><div class="error"><?php echo esc_html($error); ?></div><?php endif; ?>
+    <form method="post" action="?action=login">
+        <div class="form-group">
+            <label for="log">Username or Email</label>
+            <input type="text" id="log" name="log" required autofocus>
+        </div>
+        <div class="form-group">
+            <label for="pwd">Password</label>
+            <input type="password" id="pwd" name="pwd" required>
+        </div>
+        <button type="submit" class="btn">Log In</button>
+    </form>
+    <div class="back-link"><a href="<?php echo esc_url(CR_HOME_URL); ?>">&larr; Back to site</a></div>
+</div>
+</body>
+</html>
+<?php
+}

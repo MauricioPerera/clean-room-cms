@@ -1,0 +1,23 @@
+# Clean Room CMS - URL Rewriting
+# For Apache. For PHP built-in server, use: php -S localhost:8080 index.php
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+
+# Don't rewrite real files or directories
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Send everything to the front controller
+RewriteRule . /index.php [L]
+</IfModule>
+
+# Prevent directory listing
+Options -Indexes
+
+# Protect sensitive files
+<FilesMatch "^(wp-config\.php|\.htaccess)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

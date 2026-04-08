@@ -1,0 +1,20 @@
+# Environment
+.claude/
+wp-config.php
+
+# Uploads
+content/uploads/*
+!content/uploads/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug
+content/debug.log
