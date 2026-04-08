@@ -3,6 +3,9 @@
  * Clean Room CMS - Admin Panel
  */
 
+// Load content type builder UI
+require_once __DIR__ . '/content-types.php';
+
 // Auth check
 if (!is_user_logged_in()) {
     $action = $_GET['action'] ?? '';
@@ -60,6 +63,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'term-edit':
             cr_admin_save_term();
             break;
+        case 'content-type-edit':
+            if (($_POST['_action'] ?? '') === 'save_content_type') {
+                cr_save_content_type([
+                    'name'                => $_POST['name'] ?? '',
+                    'label'               => $_POST['label'] ?? '',
+                    'label_singular'      => $_POST['label_singular'] ?? '',
+                    'description'         => $_POST['description'] ?? '',
+                    'icon'                => $_POST['icon'] ?? '',
+                    'public'              => isset($_POST['public']) ? 1 : 0,
+                    'hierarchical'        => isset($_POST['hierarchical']) ? 1 : 0,
+                    'show_in_rest'        => isset($_POST['show_in_rest']) ? 1 : 0,
+                    'rest_base'           => $_POST['rest_base'] ?? '',
+                    'has_archive'         => isset($_POST['has_archive']) ? 1 : 0,
+                    'supports'            => $_POST['supports'] ?? ['title', 'editor'],
+                    'exclude_from_search' => isset($_POST['exclude_from_search']) ? 1 : 0,
+                    'menu_position'       => (int) ($_POST['menu_position'] ?? 25),
+                ]);
+                header('Location: ' . CR_SITE_URL . '/admin/?page=content-types&msg=saved');
+                exit;
+            }
+            break;
+        case 'content-taxonomy-edit':
+            if (($_POST['_action'] ?? '') === 'save_content_taxonomy') {
+                cr_save_content_taxonomy([
+                    'name'           => $_POST['name'] ?? '',
+                    'label'          => $_POST['label'] ?? '',
+                    'label_singular' => $_POST['label_singular'] ?? '',
+                    'hierarchical'   => isset($_POST['hierarchical']) ? 1 : 0,
+                    'public'         => isset($_POST['public']) ? 1 : 0,
+                    'show_in_rest'   => isset($_POST['show_in_rest']) ? 1 : 0,
+                    'post_types'     => $_POST['post_types'] ?? [],
+                ]);
+                header('Location: ' . CR_SITE_URL . '/admin/?page=content-taxonomies&msg=saved');
+                exit;
+            }
+            break;
+        case 'meta-field-edit':
+            if (($_POST['_action'] ?? '') === 'save_meta_field') {
+                // Parse options from text
+                $options = [];
+                $lines = array_filter(array_map('trim', explode("\n", $_POST['options_text'] ?? '')));
+                foreach ($lines as $line) {
+                    if (str_contains($line, ':')) {
+                        [$val, $lbl] = explode(':', $line, 2);
+                        $options[] = ['value' => trim($val), 'label' => trim($lbl)];
+                    } else {
+                        $options[] = ['value' => $line, 'label' => $line];
+                    }
+                }
+
+                cr_save_meta_field([
+                    'id'            => (int) ($_POST['field_id'] ?? 0),
+                    'name'          => $_POST['name'] ?? '',
+                    'label'         => $_POST['label'] ?? '',
+                    'description'   => $_POST['description'] ?? '',
+                    'post_type'     => $_POST['post_type'] ?? '',
+                    'field_type'    => $_POST['field_type'] ?? 'text',
+                    'options'       => $options,
+                    'default_value' => $_POST['default_value'] ?? '',
+                    'placeholder'   => $_POST['placeholder'] ?? '',
+                    'required'      => isset($_POST['required']) ? 1 : 0,
+                    'group_name'    => $_POST['group_name'] ?? 'Custom Fields',
+                    'position'      => (int) ($_POST['position'] ?? 0),
+                    'show_in_rest'  => isset($_POST['show_in_rest']) ? 1 : 0,
+                    'show_in_list'  => isset($_POST['show_in_list']) ? 1 : 0,
+                    'searchable'    => isset($_POST['searchable']) ? 1 : 0,
+                ]);
+                header('Location: ' . CR_SITE_URL . '/admin/?page=meta-fields&msg=saved');
+                exit;
+            }
+            break;
+    }
+}
+
+// Handle content builder deletes
+if ($admin_action === 'delete' && $page === 'content-types') {
+    $del_name = $_GET['name'] ?? '';
+    if ($del_name && current_user_can('manage_options')) {
+        cr_delete_content_type($del_name);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=content-types&msg=deleted');
+        exit;
+    }
+}
+if ($admin_action === 'delete' && $page === 'content-taxonomies') {
+    $del_name = $_GET['name'] ?? '';
+    if ($del_name && current_user_can('manage_options')) {
+        cr_delete_content_taxonomy($del_name);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=content-taxonomies&msg=deleted');
+        exit;
+    }
+}
+if ($admin_action === 'delete' && $page === 'meta-fields') {
+    $del_id = (int) ($_GET['id'] ?? 0);
+    if ($del_id && current_user_can('manage_options')) {
+        cr_delete_meta_field($del_id);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=meta-fields&msg=deleted');
+        exit;
     }
 }
 
@@ -91,16 +191,37 @@ cr_admin_page($page);
 function cr_admin_page(string $page): void {
     cr_admin_header($page);
 
-    match ($page) {
-        'posts'      => cr_admin_posts_list('post'),
-        'pages'      => cr_admin_posts_list('page'),
-        'post-edit'  => cr_admin_post_edit(),
-        'categories' => cr_admin_taxonomy_list('category'),
-        'tags'       => cr_admin_taxonomy_list('post_tag'),
-        'term-edit'  => cr_admin_term_edit(),
-        'settings'   => cr_admin_settings(),
-        default      => cr_admin_dashboard(),
+    $matched = match ($page) {
+        'posts'                  => fn() => cr_admin_posts_list('post'),
+        'pages'                  => fn() => cr_admin_posts_list('page'),
+        'post-edit'              => fn() => cr_admin_post_edit(),
+        'categories'             => fn() => cr_admin_taxonomy_list('category'),
+        'tags'                   => fn() => cr_admin_taxonomy_list('post_tag'),
+        'term-edit'              => fn() => cr_admin_term_edit(),
+        'content-types'          => fn() => cr_admin_content_types_list(),
+        'content-type-edit'      => fn() => cr_admin_content_type_edit(),
+        'content-taxonomies'     => fn() => cr_admin_content_taxonomies_list(),
+        'content-taxonomy-edit'  => fn() => cr_admin_content_taxonomy_edit(),
+        'meta-fields'            => fn() => cr_admin_meta_fields_list(),
+        'meta-field-edit'        => fn() => cr_admin_meta_field_edit(),
+        'settings'               => fn() => cr_admin_settings(),
+        'dashboard'              => fn() => cr_admin_dashboard(),
+        default                  => null,
     };
+
+    if ($matched) {
+        $matched();
+    } elseif (str_starts_with($page, 'type-')) {
+        // Dynamic custom type list page: ?page=type-product → list products
+        $cpt_name = substr($page, 5);
+        if (post_type_exists($cpt_name)) {
+            cr_admin_posts_list($cpt_name);
+        } else {
+            cr_admin_dashboard();
+        }
+    } else {
+        cr_admin_dashboard();
+    }
 
     cr_admin_footer();
 }
@@ -128,6 +249,21 @@ function cr_admin_header(string $current_page): void {
             <a href="?page=categories" class="<?php echo $current_page === 'categories' ? 'active' : ''; ?> sub">Categories</a>
             <a href="?page=tags" class="<?php echo $current_page === 'tags' ? 'active' : ''; ?> sub">Tags</a>
             <a href="?page=pages" class="<?php echo $current_page === 'pages' ? 'active' : ''; ?>">Pages</a>
+            <?php
+            // Dynamic custom content type entries
+            $custom_types = cr_get_content_types();
+            foreach ($custom_types as $ct):
+                if ($ct->status !== 'active') continue;
+                $ct_page = 'type-' . $ct->name;
+                $icon = $ct->icon ?: '📄';
+            ?>
+            <a href="?page=<?php echo esc_attr($ct_page); ?>" class="<?php echo $current_page === $ct_page ? 'active' : ''; ?>"><?php echo esc_html($icon . ' ' . $ct->label); ?></a>
+            <?php endforeach; ?>
+            <div class="nav-separator"></div>
+            <a href="?page=content-types" class="<?php echo str_starts_with($current_page, 'content-type') ? 'active' : ''; ?>">Content Types</a>
+            <a href="?page=content-taxonomies" class="<?php echo str_starts_with($current_page, 'content-taxonom') ? 'active' : ''; ?> sub">Taxonomies</a>
+            <a href="?page=meta-fields" class="<?php echo str_starts_with($current_page, 'meta-field') ? 'active' : ''; ?> sub">Meta Fields</a>
+            <div class="nav-separator"></div>
             <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
         </nav>
         <div class="admin-user">
@@ -324,7 +460,51 @@ function cr_admin_post_edit(): void {
             </div>
         </div>
 
-        <?php if ($post_type === 'post'):
+        <?php
+        // Dynamic meta fields for this post type
+        $meta_html = cr_render_meta_fields_form($post_type, $post ? (int) $post->ID : 0);
+        if ($meta_html):
+        ?>
+        <div class="meta-fields-section">
+            <?php echo $meta_html; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php
+        // Dynamic taxonomy selectors from get_object_taxonomies
+        $type_taxonomies = get_object_taxonomies($post_type);
+        foreach ($type_taxonomies as $tax_name):
+            $tax_obj = get_taxonomy($tax_name);
+            if (!$tax_obj || !$tax_obj->show_ui) continue;
+            $all_tax_terms = get_terms(['taxonomy' => $tax_name, 'hide_empty' => false, 'orderby' => 'name']);
+            $post_tax_terms = $post ? array_map(fn($t) => (int) $t->term_id, get_the_terms((int) $post->ID, $tax_name)) : [];
+        ?>
+        <div class="form-group">
+            <label><?php echo esc_html($tax_obj->label); ?></label>
+            <?php if ($tax_obj->hierarchical): ?>
+                <div class="checkbox-list">
+                    <?php foreach ($all_tax_terms as $t): ?>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="tax_<?php echo esc_attr($tax_name); ?>[]" value="<?php echo $t->term_id; ?>"
+                                <?php echo in_array((int) $t->term_id, $post_tax_terms) ? 'checked' : ''; ?>>
+                            <?php echo esc_html($t->name); ?>
+                        </label>
+                    <?php endforeach; ?>
+                    <?php if (empty($all_tax_terms)): ?>
+                        <p class="text-muted">No terms yet. <a href="?page=term-edit&taxonomy=<?php echo esc_attr($tax_name); ?>">Create one</a></p>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
+                <?php
+                $tag_names = !empty($post_tax_terms) ? implode(', ', array_map(fn($tid) => get_term($tid, $tax_name)?->name ?? '', $post_tax_terms)) : '';
+                ?>
+                <input type="text" name="tax_<?php echo esc_attr($tax_name); ?>_flat" value="<?php echo esc_attr($tag_names); ?>" class="input-full" placeholder="Comma separated">
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+
+        <?php /* Legacy hardcoded categories/tags for 'post' type - keep for backwards compat */
+        if ($post_type === 'post' && empty($type_taxonomies)):
             // Category checkboxes
             $all_cats = get_terms(['taxonomy' => 'category', 'hide_empty' => false, 'orderby' => 'name']);
             $post_cats = $post ? array_map(fn($t) => (int) $t->term_id, get_the_terms((int) $post->ID, 'category')) : [];
@@ -385,21 +565,43 @@ function cr_admin_save_post(): void {
         $post_id = cr_insert_post($data);
     }
 
-    // Save categories (for posts)
-    if ($data['post_type'] === 'post' && $post_id) {
-        $categories = $_POST['post_categories'] ?? [];
-        $cat_ids = array_map('intval', $categories);
-        cr_set_post_terms($post_id, $cat_ids, 'category');
+    if ($post_id) {
+        // Save dynamic taxonomy assignments
+        $type_taxonomies = get_object_taxonomies($data['post_type']);
+        foreach ($type_taxonomies as $tax_name) {
+            $tax_obj = get_taxonomy($tax_name);
+            if (!$tax_obj) continue;
 
-        // Save tags (comma separated)
-        $tags_input = trim($_POST['post_tags'] ?? '');
-        if (!empty($tags_input)) {
-            $tag_names = array_map('trim', explode(',', $tags_input));
-            $tag_names = array_filter($tag_names, fn($t) => !empty($t));
-            cr_set_post_terms($post_id, $tag_names, 'post_tag');
-        } else {
-            cr_set_post_terms($post_id, [], 'post_tag');
+            if ($tax_obj->hierarchical) {
+                // Checkbox-based: tax_category[], tax_brand[]
+                $term_ids = $_POST['tax_' . $tax_name] ?? [];
+                cr_set_post_terms($post_id, array_map('intval', $term_ids), $tax_name);
+            } else {
+                // Comma-separated flat tags: tax_post_tag_flat
+                $flat_input = trim($_POST['tax_' . $tax_name . '_flat'] ?? '');
+                if (!empty($flat_input)) {
+                    $names = array_filter(array_map('trim', explode(',', $flat_input)));
+                    cr_set_post_terms($post_id, $names, $tax_name);
+                } else {
+                    cr_set_post_terms($post_id, [], $tax_name);
+                }
+            }
         }
+
+        // Legacy fallback: hardcoded post_categories/post_tags for 'post' type
+        if ($data['post_type'] === 'post' && empty($type_taxonomies)) {
+            $categories = $_POST['post_categories'] ?? [];
+            cr_set_post_terms($post_id, array_map('intval', $categories), 'category');
+            $tags_input = trim($_POST['post_tags'] ?? '');
+            if (!empty($tags_input)) {
+                cr_set_post_terms($post_id, array_filter(array_map('trim', explode(',', $tags_input))), 'post_tag');
+            } else {
+                cr_set_post_terms($post_id, [], 'post_tag');
+            }
+        }
+
+        // Save custom meta fields
+        cr_save_meta_fields_from_post($post_id, $data['post_type']);
     }
 
     $list_page = $data['post_type'] === 'page' ? 'pages' : 'posts';

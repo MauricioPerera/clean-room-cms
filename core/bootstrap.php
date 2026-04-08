@@ -78,7 +78,10 @@ if (file_exists($vendor_autoload)) {
     require_once $vendor_autoload;
 }
 
-// 19. AI Subsystem
+// 19. Content Builder (DB-driven content types, taxonomies, meta fields)
+require_once CR_CORE_PATH . '/content-builder.php';
+
+// 20. AI Subsystem
 require_once CR_CORE_PATH . '/ai/client.php';
 require_once CR_CORE_PATH . '/ai/abilities.php';
 require_once CR_CORE_PATH . '/ai/guidelines.php';
@@ -130,6 +133,13 @@ function cr_bootstrap(): void {
 
     // Initialize current user from auth cookie
     cr_init_current_user();
+
+    // Install content builder tables (if missing)
+    cr_content_builder_install();
+
+    // Load DB-defined content types and taxonomies
+    cr_load_db_content_types();
+    cr_load_db_taxonomies();
 
     // Initialize AI connectors from settings
     cr_ai_init_connectors();

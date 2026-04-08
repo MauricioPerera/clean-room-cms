@@ -88,6 +88,7 @@ function test_load_core(): void {
         require_once $vendor;
     }
 
+    require_once CR_CORE_PATH . '/content-builder.php';
     require_once CR_CORE_PATH . '/ai/vectors.php';
 }
 

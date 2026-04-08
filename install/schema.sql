@@ -153,3 +153,70 @@ CREATE TABLE IF NOT EXISTS `{prefix}options` (
     UNIQUE KEY `option_name` (`option_name`),
     KEY `autoload` (`autoload`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `{prefix}content_types` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(20) NOT NULL,
+    `label` VARCHAR(200) NOT NULL,
+    `label_singular` VARCHAR(200) NOT NULL DEFAULT '',
+    `description` TEXT,
+    `icon` VARCHAR(50) NOT NULL DEFAULT '',
+    `public` TINYINT(1) NOT NULL DEFAULT 1,
+    `hierarchical` TINYINT(1) NOT NULL DEFAULT 0,
+    `show_in_rest` TINYINT(1) NOT NULL DEFAULT 1,
+    `rest_base` VARCHAR(100) NOT NULL DEFAULT '',
+    `has_archive` TINYINT(1) NOT NULL DEFAULT 1,
+    `supports` JSON NOT NULL,
+    `exclude_from_search` TINYINT(1) NOT NULL DEFAULT 0,
+    `menu_position` INT NOT NULL DEFAULT 25,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `{prefix}content_taxonomies` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(32) NOT NULL,
+    `label` VARCHAR(200) NOT NULL,
+    `label_singular` VARCHAR(200) NOT NULL DEFAULT '',
+    `description` TEXT,
+    `hierarchical` TINYINT(1) NOT NULL DEFAULT 0,
+    `public` TINYINT(1) NOT NULL DEFAULT 1,
+    `show_in_rest` TINYINT(1) NOT NULL DEFAULT 1,
+    `rest_base` VARCHAR(100) NOT NULL DEFAULT '',
+    `post_types` JSON NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `{prefix}meta_fields` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `label` VARCHAR(200) NOT NULL,
+    `description` TEXT,
+    `object_type` VARCHAR(20) NOT NULL DEFAULT 'post',
+    `post_type` VARCHAR(20) NOT NULL DEFAULT '',
+    `field_type` VARCHAR(50) NOT NULL DEFAULT 'text',
+    `options` JSON NOT NULL,
+    `default_value` TEXT,
+    `placeholder` VARCHAR(200) NOT NULL DEFAULT '',
+    `required` TINYINT(1) NOT NULL DEFAULT 0,
+    `validation` JSON NOT NULL,
+    `position` INT NOT NULL DEFAULT 0,
+    `group_name` VARCHAR(100) NOT NULL DEFAULT 'Custom Fields',
+    `show_in_rest` TINYINT(1) NOT NULL DEFAULT 1,
+    `show_in_list` TINYINT(1) NOT NULL DEFAULT 0,
+    `searchable` TINYINT(1) NOT NULL DEFAULT 0,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `name_post_type` (`name`, `post_type`, `object_type`),
+    KEY `post_type` (`post_type`),
+    KEY `object_type` (`object_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

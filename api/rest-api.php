@@ -219,6 +219,82 @@ class CR_REST_API {
             ['methods' => 'GET', 'callback' => [$this, 'get_settings'], 'permission_callback' => fn() => current_user_can('manage_options')],
             ['methods' => 'POST', 'callback' => [$this, 'update_settings'], 'permission_callback' => fn() => current_user_can('manage_options')],
         ]);
+
+        // -- Dynamic routes for DB-defined content types --
+        $this->register_dynamic_routes($ns);
+    }
+
+    private function register_dynamic_routes(string $ns): void {
+        if (!function_exists('cr_get_content_types')) return;
+
+        // Custom content type CRUD routes
+        foreach (cr_get_content_types() as $ct) {
+            if ($ct->status !== 'active' || !$ct->show_in_rest) continue;
+            $base = $ct->rest_base ?: $ct->name . 's';
+            $type_name = $ct->name;
+
+            $this->register_route($ns, '/' . $base, [
+                ['methods' => 'GET', 'callback' => fn($p) => $this->get_posts(array_merge($p, ['post_type' => $type_name]))],
+                ['methods' => 'POST', 'callback' => fn($p) => $this->create_post(array_merge($p, ['post_type' => $type_name])), 'permission_callback' => fn() => current_user_can('publish_posts')],
+            ]);
+            $this->register_route($ns, '/' . $base . '/{id}', [
+                ['methods' => 'GET', 'callback' => [$this, 'get_post']],
+                ['methods' => ['PUT', 'PATCH'], 'callback' => [$this, 'update_post'], 'permission_callback' => fn() => current_user_can('edit_posts')],
+                ['methods' => 'DELETE', 'callback' => [$this, 'delete_post_endpoint'], 'permission_callback' => fn() => current_user_can('delete_posts')],
+            ]);
+        }
+
+        // Custom taxonomy routes
+        foreach (cr_get_content_taxonomies() as $tax) {
+            if ($tax->status !== 'active' || !$tax->show_in_rest) continue;
+            $base = $tax->rest_base ?: $tax->name;
+            $tax_name = $tax->name;
+
+            $this->register_route($ns, '/' . $base, [
+                ['methods' => 'GET', 'callback' => fn($p) => $this->get_terms_endpoint($tax_name, $p)],
+                ['methods' => 'POST', 'callback' => fn($p) => $this->create_term_endpoint($tax_name, $p), 'permission_callback' => fn() => current_user_can('manage_categories')],
+            ]);
+        }
+
+        // Content type management API
+        $this->register_route($ns, '/content-types', [
+            ['methods' => 'GET', 'callback' => fn() => array_map(fn($t) => (array) $t, cr_get_content_types())],
+            ['methods' => 'POST', 'callback' => function ($p) {
+                $id = cr_save_content_type($p);
+                return $id ? cr_get_content_type($p['name'] ?? '') : ['error' => 'Failed'];
+            }, 'permission_callback' => fn() => current_user_can('manage_options')],
+        ]);
+        $this->register_route($ns, '/content-types/{name}', [
+            ['methods' => ['PUT', 'PATCH'], 'callback' => function ($p) {
+                $id = cr_save_content_type($p);
+                return $id ? cr_get_content_type($p['name'] ?? '') : ['error' => 'Failed'];
+            }, 'permission_callback' => fn() => current_user_can('manage_options')],
+            ['methods' => 'DELETE', 'callback' => function ($p) {
+                return ['deleted' => cr_delete_content_type($p['name'] ?? '')];
+            }, 'permission_callback' => fn() => current_user_can('manage_options')],
+        ]);
+
+        // Meta field management API
+        $this->register_route($ns, '/meta-fields', [
+            ['methods' => 'GET', 'callback' => function ($p) {
+                $pt = $p['post_type'] ?? '';
+                return array_map(fn($f) => (array) $f, cr_get_meta_fields($pt));
+            }],
+            ['methods' => 'POST', 'callback' => function ($p) {
+                $id = cr_save_meta_field($p);
+                return $id ? cr_get_meta_field($id) : ['error' => 'Failed'];
+            }, 'permission_callback' => fn() => current_user_can('manage_options')],
+        ]);
+        $this->register_route($ns, '/meta-fields/{id}', [
+            ['methods' => ['PUT', 'PATCH'], 'callback' => function ($p) {
+                $p['id'] = (int) $p['id'];
+                $id = cr_save_meta_field($p);
+                return $id ? cr_get_meta_field($id) : ['error' => 'Failed'];
+            }, 'permission_callback' => fn() => current_user_can('manage_options')],
+            ['methods' => 'DELETE', 'callback' => function ($p) {
+                return ['deleted' => cr_delete_meta_field((int) $p['id'])];
+            }, 'permission_callback' => fn() => current_user_can('manage_options')],
+        ]);
     }
 
     // -- Callbacks --

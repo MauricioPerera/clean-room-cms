@@ -252,6 +252,38 @@ select {
 .admin-notice.success { background: #edf7ed; border-color: var(--color-success); }
 .admin-notice.error { background: #fcf0f1; border-color: var(--color-danger); }
 
+/* Nav separator */
+.nav-separator {
+    height: 1px;
+    background: rgba(255,255,255,.1);
+    margin: 8px 16px;
+}
+
+/* Meta field groups */
+.meta-fields-section { margin-top: 8px; }
+.meta-group {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    background: #f9f9f9;
+}
+.meta-group-title {
+    font-size: .95em;
+    font-weight: 700;
+    color: var(--color-text-light);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+.meta-field .field-desc {
+    margin-top: 4px;
+    font-size: .8em;
+    color: var(--color-text-light);
+}
+
 /* Sidebar submenu items */
 .admin-nav a.sub {
     padding-left: 36px;
