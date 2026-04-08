@@ -72,11 +72,18 @@ require_once CR_CORE_PATH . '/jsonmeta.php';
 // 17. Async Queue System
 require_once CR_CORE_PATH . '/queue.php';
 
-// 18. AI Subsystem
+// 18. Vendor autoloader
+$vendor_autoload = CR_BASE_PATH . '/vendor/autoload.php';
+if (file_exists($vendor_autoload)) {
+    require_once $vendor_autoload;
+}
+
+// 19. AI Subsystem
 require_once CR_CORE_PATH . '/ai/client.php';
 require_once CR_CORE_PATH . '/ai/abilities.php';
 require_once CR_CORE_PATH . '/ai/guidelines.php';
 require_once CR_CORE_PATH . '/ai/mcp.php';
+require_once CR_CORE_PATH . '/ai/vectors.php';
 
 /**
  * Initialize the CMS.

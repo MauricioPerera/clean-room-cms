@@ -112,6 +112,9 @@ if ($db_ok) {
     test_guidelines();
     test_mcp();
 
+    require_once __DIR__ . '/Integration/VectorsTest.php';
+    test_vectors();
+
     // ==========================================
     // PHASE 3: API Tests (need database + REST API)
     // ==========================================
@@ -144,7 +147,7 @@ if ($db_ok) {
                   'Taxonomy System', 'Query Engine', 'User System', 'Template Engine',
                   'Plugin Sandbox', 'JSON Meta System', 'LRU Cache + Namespaced Options',
                   'Security System', 'Async Queue System',
-                  'AI Client SDK', 'Abilities API', 'Content Guidelines', 'MCP Adapter',
+                  'AI Client SDK', 'Abilities API', 'Content Guidelines', 'MCP Adapter', 'Vector Search Integration',
                   'REST API'];
     $_test_total_suites += count($db_suites);
 }

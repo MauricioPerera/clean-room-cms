@@ -81,6 +81,14 @@ function test_load_core(): void {
     require_once CR_CORE_PATH . '/ai/abilities.php';
     require_once CR_CORE_PATH . '/ai/guidelines.php';
     require_once CR_CORE_PATH . '/ai/mcp.php';
+
+    // Vendor autoloader
+    $vendor = CR_BASE_PATH . '/vendor/autoload.php';
+    if (file_exists($vendor)) {
+        require_once $vendor;
+    }
+
+    require_once CR_CORE_PATH . '/ai/vectors.php';
 }
 
 /**
