@@ -26,10 +26,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === '2') {
             $schema = file_get_contents(__DIR__ . '/schema.sql');
             $schema = str_replace('{prefix}', $db->prefix, $schema);
 
+            // Remove SQL comments and disable strict mode for date defaults
+            $schema = preg_replace('/^--.*$/m', '', $schema);
+            $db->query("SET SESSION sql_mode = ''");
+
             // Split into individual statements
             $statements = array_filter(
                 array_map('trim', explode(';', $schema)),
-                fn($s) => !empty($s) && !str_starts_with($s, '--')
+                fn($s) => !empty($s) && strlen($s) > 5
             );
 
             foreach ($statements as $sql) {
