@@ -466,7 +466,7 @@ function cr_validate_meta_field(array $field, mixed $value): ?string {
     if (isset($validation['max']) && $validation['max'] !== '' && is_numeric($value) && $value > $validation['max']) {
         return "Field '{$field['label']}' must be at most {$validation['max']}.";
     }
-    if (!empty($validation['pattern']) && !preg_match('/' . $validation['pattern'] . '/', $value)) {
+    if (!empty($validation['pattern']) && @preg_match('/' . str_replace('/', '\\/', $validation['pattern']) . '/', (string) $value) === 0) {
         return "Field '{$field['label']}' has an invalid format.";
     }
 

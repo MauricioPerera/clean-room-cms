@@ -72,8 +72,8 @@ function initConditionalLogic() {
             case '>=': return parseFloat(actual) >= parseFloat(expected);
             case '<=': return parseFloat(actual) <= parseFloat(expected);
             case 'contains': return actual.includes(expected);
-            case 'empty': return !actual;
-            case 'not_empty': return !!actual;
+            case 'empty': return actual === '' || actual === null || actual === undefined;
+            case 'not_empty': return actual !== '' && actual !== null && actual !== undefined;
             default: return true;
         }
     }

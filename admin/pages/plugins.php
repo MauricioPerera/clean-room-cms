@@ -30,9 +30,9 @@ function cr_admin_plugins_list(): void {
                 <td><span class="status-badge status-<?php echo $is_active ? 'publish' : 'draft'; ?>"><?php echo $is_active ? 'Active' : 'Inactive'; ?></span></td>
                 <td>
                     <?php if ($is_active): ?>
-                        <a href="?page=plugins&action=deactivate&plugin=<?php echo urlencode($file); ?>">Deactivate</a>
+                        <a href="?page=plugins&action=deactivate&plugin=<?php echo urlencode($file); ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>">Deactivate</a>
                     <?php else: ?>
-                        <a href="?page=plugins&action=activate&plugin=<?php echo urlencode($file); ?>">Activate</a>
+                        <a href="?page=plugins&action=activate&plugin=<?php echo urlencode($file); ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>">Activate</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -132,7 +132,7 @@ function cr_admin_themes_list(): void {
             </div>
             <div class="theme-actions">
                 <?php if (!$is_active): ?>
-                    <a href="?page=themes&action=switch&theme=<?php echo urlencode($slug); ?>" class="btn btn-primary btn-sm">Activate</a>
+                    <a href="?page=themes&action=switch&theme=<?php echo urlencode($slug); ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="btn btn-primary btn-sm">Activate</a>
                 <?php else: ?>
                     <span class="status-badge status-publish">Active</span>
                 <?php endif; ?>

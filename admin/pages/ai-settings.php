@@ -204,7 +204,7 @@ function cr_admin_vector_settings(): void {
 
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Save Settings</button>
-            <a href="?page=vector-settings&action=reindex" class="btn btn-secondary" onclick="return confirm('Reindex all published posts? This may take a while.')">Reindex All Posts</a>
+            <a href="?page=vector-settings&action=reindex&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="btn btn-secondary" onclick="return confirm('Reindex all published posts? This may take a while.')">Reindex All Posts</a>
         </div>
     </form>
 <?php

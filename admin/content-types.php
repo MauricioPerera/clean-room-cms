@@ -40,7 +40,7 @@ function cr_admin_content_types_list(): void {
                 <td>
                     <a href="?page=content-type-edit&name=<?php echo esc_attr($type->name); ?>">Edit</a>
                     <a href="?page=type-<?php echo esc_attr($type->name); ?>">View Items</a>
-                    <a href="?page=content-types&action=delete&name=<?php echo esc_attr($type->name); ?>" class="text-danger" onclick="return confirm('Delete this content type? Posts of this type will remain in the database.')">Delete</a>
+                    <a href="?page=content-types&action=delete&name=<?php echo esc_attr($type->name); ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this content type? Posts of this type will remain in the database.')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -166,7 +166,7 @@ function cr_admin_content_taxonomies_list(): void {
                 <td><span class="status-badge status-<?php echo $tax->status === 'active' ? 'publish' : 'draft'; ?>"><?php echo esc_html($tax->status); ?></span></td>
                 <td>
                     <a href="?page=content-taxonomy-edit&name=<?php echo esc_attr($tax->name); ?>">Edit</a>
-                    <a href="?page=content-taxonomies&action=delete&name=<?php echo esc_attr($tax->name); ?>" class="text-danger" onclick="return confirm('Delete this taxonomy?')">Delete</a>
+                    <a href="?page=content-taxonomies&action=delete&name=<?php echo esc_attr($tax->name); ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this taxonomy?')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -268,7 +268,7 @@ function cr_admin_meta_fields_list(): void {
                 <td><?php echo $f->show_in_rest ? '✓' : '—'; ?></td>
                 <td>
                     <a href="?page=meta-field-edit&id=<?php echo $f->id; ?>">Edit</a>
-                    <a href="?page=meta-fields&action=delete&id=<?php echo $f->id; ?>" class="text-danger" onclick="return confirm('Delete this field? Existing data in posts will not be removed.')">Delete</a>
+                    <a href="?page=meta-fields&action=delete&id=<?php echo $f->id; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this field? Existing data in posts will not be removed.')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -531,7 +531,7 @@ function cr_admin_field_groups_list(): void {
                 <td><?php echo (int) $g->position; ?></td>
                 <td>
                     <a href="?page=field-group-edit&id=<?php echo $g->id; ?>">Edit</a>
-                    <a href="?page=field-groups&action=delete&id=<?php echo $g->id; ?>" class="text-danger" onclick="return confirm('Delete this group? Fields will be unlinked but not deleted.')">Delete</a>
+                    <a href="?page=field-groups&action=delete&id=<?php echo $g->id; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this group? Fields will be unlinked but not deleted.')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>

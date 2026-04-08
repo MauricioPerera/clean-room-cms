@@ -32,7 +32,7 @@ function cr_admin_users_list(): void {
                 <td>
                     <a href="?page=user-edit&id=<?php echo $u->ID; ?>">Edit</a>
                     <?php if ((int) $u->ID !== get_current_user_id()): ?>
-                        <a href="?page=users&action=delete&id=<?php echo $u->ID; ?>" class="text-danger" onclick="return confirm('Delete this user?')">Delete</a>
+                        <a href="?page=users&action=delete&id=<?php echo $u->ID; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this user?')">Delete</a>
                     <?php endif; ?>
                 </td>
             </tr>

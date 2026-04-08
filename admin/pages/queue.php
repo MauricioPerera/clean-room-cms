@@ -44,7 +44,7 @@ function cr_admin_queue_monitor(): void {
         <a href="?page=queue" class="btn btn-sm <?php echo $filter === 'all' ? 'btn-primary' : 'btn-secondary'; ?>">All</a>
         <a href="?page=queue&filter=pending" class="btn btn-sm <?php echo $filter === 'pending' ? 'btn-primary' : 'btn-secondary'; ?>">Pending</a>
         <a href="?page=queue&filter=failed" class="btn btn-sm <?php echo $filter === 'failed' ? 'btn-primary' : 'btn-secondary'; ?>">Failed</a>
-        <a href="?page=queue&action=cleanup" class="btn btn-sm btn-secondary" onclick="return confirm('Clean completed/dead jobs older than 7 days?')">Cleanup</a>
+        <a href="?page=queue&action=cleanup&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="btn btn-sm btn-secondary" onclick="return confirm('Clean completed/dead jobs older than 7 days?')">Cleanup</a>
     </div>
 
     <table class="admin-table">
@@ -60,7 +60,7 @@ function cr_admin_queue_monitor(): void {
                 <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?php echo esc_html($j->last_error ?? ''); ?></td>
                 <td>
                     <?php if ($j->status === 'dead' || $j->status === 'failed'): ?>
-                        <a href="?page=queue&action=retry&id=<?php echo $j->id; ?>">Retry</a>
+                        <a href="?page=queue&action=retry&id=<?php echo $j->id; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>">Retry</a>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -181,12 +181,12 @@ function cr_admin_comments(): void {
                 <td><span class="status-badge status-<?php echo $c->comment_approved === '1' ? 'publish' : 'draft'; ?>"><?php echo $c->comment_approved === '1' ? 'Approved' : ($c->comment_approved === 'spam' ? 'Spam' : 'Pending'); ?></span></td>
                 <td>
                     <?php if ($c->comment_approved !== '1'): ?>
-                        <a href="?page=comments&action=approve&id=<?php echo $c->comment_ID; ?>">Approve</a>
+                        <a href="?page=comments&action=approve&id=<?php echo $c->comment_ID; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>">Approve</a>
                     <?php endif; ?>
                     <?php if ($c->comment_approved !== 'spam'): ?>
-                        <a href="?page=comments&action=spam&id=<?php echo $c->comment_ID; ?>">Spam</a>
+                        <a href="?page=comments&action=spam&id=<?php echo $c->comment_ID; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>">Spam</a>
                     <?php endif; ?>
-                    <a href="?page=comments&action=delete&id=<?php echo $c->comment_ID; ?>" class="text-danger" onclick="return confirm('Delete this comment?')">Delete</a>
+                    <a href="?page=comments&action=delete&id=<?php echo $c->comment_ID; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this comment?')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -242,7 +242,7 @@ function cr_admin_media(): void {
             </div>
             <div class="media-actions">
                 <input type="text" value="<?php echo esc_attr($url); ?>" readonly onclick="this.select()" class="input-full" style="font-size:.75em">
-                <a href="?page=media&action=delete&id=<?php echo $m->ID; ?>" class="text-danger" onclick="return confirm('Delete this file?')">Delete</a>
+                <a href="?page=media&action=delete&id=<?php echo $m->ID; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this file?')">Delete</a>
             </div>
         </div>
         <?php endforeach; ?>
@@ -260,8 +260,14 @@ function cr_admin_upload_media(): void {
     }
 
     $file = $_FILES['media_file'];
-    $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'application/pdf', 'text/plain', 'text/csv'];
-    if (!in_array($file['type'], $allowed)) {
+    $allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv'];
+
+    // Server-side MIME validation (don't trust client-reported type)
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $actual_type = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+
+    if (!in_array($actual_type, $allowed)) {
         header('Location: ' . CR_SITE_URL . '/admin/?page=media&msg=error');
         exit;
     }

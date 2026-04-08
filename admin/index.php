@@ -173,21 +173,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sf_names = $_POST['sub_field_name'] ?? [];
                     $sf_labels = $_POST['sub_field_label'] ?? [];
                     $sf_types = $_POST['sub_field_type'] ?? [];
+                    $allowed_field_types = array_keys(cr_get_field_types());
                     $sub_fields = [];
                     foreach ($sf_names as $si => $sn) {
                         if (!empty($sn)) {
+                            $sf_type = $sf_types[$si] ?? 'text';
                             $sub_fields[] = [
                                 'name' => preg_replace('/[^a-z0-9_]/', '', strtolower($sn)),
-                                'label' => $sf_labels[$si] ?? $sn,
-                                'field_type' => $sf_types[$si] ?? 'text',
+                                'label' => sanitize_text_field($sf_labels[$si] ?? $sn),
+                                'field_type' => in_array($sf_type, $allowed_field_types) ? $sf_type : 'text',
                             ];
                         }
                     }
                     $options = [
                         'sub_fields' => $sub_fields,
-                        'min_rows' => (int) ($_POST['repeater_min_rows'] ?? 0),
-                        'max_rows' => (int) ($_POST['repeater_max_rows'] ?? 20),
-                        'button_label' => $_POST['repeater_button_label'] ?? 'Add Row',
+                        'min_rows' => max(0, (int) ($_POST['repeater_min_rows'] ?? 0)),
+                        'max_rows' => min(1000, max(1, (int) ($_POST['repeater_max_rows'] ?? 20))),
+                        'button_label' => sanitize_text_field($_POST['repeater_button_label'] ?? 'Add Row'),
                     ];
                 }
 
@@ -225,8 +227,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// CSRF nonce check for all GET-based actions
+$_action_nonce_valid = cr_verify_nonce($_GET['_nonce'] ?? '', 'admin_action');
+
 // Handle user delete
-if ($admin_action === 'delete' && $page === 'users') {
+if ($admin_action === 'delete' && $page === 'users' && $_action_nonce_valid) {
     $del_id = (int) ($_GET['id'] ?? 0);
     if ($del_id && $del_id !== get_current_user_id() && current_user_can('delete_users')) {
         $db = cr_db();
@@ -238,7 +243,7 @@ if ($admin_action === 'delete' && $page === 'users') {
 }
 
 // Handle plugin activate/deactivate
-if ($page === 'plugins' && ($admin_action === 'activate' || $admin_action === 'deactivate')) {
+if ($page === 'plugins' && ($admin_action === 'activate' || $admin_action === 'deactivate') && $_action_nonce_valid) {
     $plugin = $_GET['plugin'] ?? '';
     if ($plugin && current_user_can('activate_plugins')) {
         if ($admin_action === 'activate') cr_admin_activate_plugin($plugin);
@@ -572,7 +577,7 @@ function cr_admin_posts_list(string $post_type): void {
                 <td>
                     <a href="?page=post-edit&id=<?php echo $p->ID; ?>">Edit</a>
                     <a href="<?php echo esc_url(get_permalink($p->ID)); ?>" target="_blank">View</a>
-                    <a href="?page=posts&action=delete&id=<?php echo $p->ID; ?>" class="text-danger" onclick="return confirm('Delete this post?')">Delete</a>
+                    <a href="?page=posts&action=delete&id=<?php echo $p->ID; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this post?')">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
@@ -864,7 +869,7 @@ function cr_admin_taxonomy_list(string $taxonomy): void {
                 <td>
                     <a href="?page=term-edit&taxonomy=<?php echo esc_attr($taxonomy); ?>&id=<?php echo $term->term_id; ?>">Edit</a>
                     <?php if ($term->slug !== 'uncategorized'): ?>
-                        <a href="?page=<?php echo $page_slug; ?>&action=delete&id=<?php echo $term->term_id; ?>" class="text-danger" onclick="return confirm('Delete this term?')">Delete</a>
+                        <a href="?page=<?php echo $page_slug; ?>&action=delete&id=<?php echo $term->term_id; ?>&_nonce=<?php echo cr_create_nonce('admin_action'); ?>" class="text-danger" onclick="return confirm('Delete this term?')">Delete</a>
                     <?php endif; ?>
                 </td>
             </tr>
