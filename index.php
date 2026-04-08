@@ -6,6 +6,34 @@
  * Loads the CMS, parses the request, and renders the appropriate template.
  */
 
+// Serve static files directly (PHP built-in server only)
+if (php_sapi_name() === 'cli-server') {
+    $path = __DIR__ . parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    if (is_file($path)) {
+        $ext = pathinfo($path, PATHINFO_EXTENSION);
+        $mime = match ($ext) {
+            'css'  => 'text/css',
+            'js'   => 'application/javascript',
+            'json' => 'application/json',
+            'png'  => 'image/png',
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'  => 'image/gif',
+            'svg'  => 'image/svg+xml',
+            'ico'  => 'image/x-icon',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+            'ttf'  => 'font/ttf',
+            'webp' => 'image/webp',
+            default => null,
+        };
+        if ($mime) {
+            header("Content-Type: {$mime}");
+            readfile($path);
+            return;
+        }
+    }
+}
+
 // Load configuration and bootstrap the CMS
 require_once __DIR__ . '/config.php';
 
