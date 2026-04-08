@@ -3,8 +3,13 @@
  * Clean Room CMS - Admin Panel
  */
 
-// Load content type builder UI
+// Load admin page modules
 require_once __DIR__ . '/content-types.php';
+require_once __DIR__ . '/pages/users.php';
+require_once __DIR__ . '/pages/plugins.php';
+require_once __DIR__ . '/pages/ai-settings.php';
+require_once __DIR__ . '/pages/queue.php';
+require_once __DIR__ . '/pages/settings.php';
 
 // Auth check
 if (!is_user_logged_in()) {
@@ -58,7 +63,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             cr_admin_save_post();
             break;
         case 'settings':
-            cr_admin_save_settings();
+            cr_admin_save_settings_full();
+            break;
+        case 'user-edit':
+            if (($_POST['_action'] ?? '') === 'save_user') { cr_admin_save_user(); }
+            break;
+        case 'ai-settings':
+            if (($_POST['_action'] ?? '') === 'save_ai_settings') { cr_admin_save_ai_settings(); }
+            break;
+        case 'guidelines':
+            if (($_POST['_action'] ?? '') === 'save_guidelines') { cr_admin_save_guidelines(); }
+            break;
+        case 'vector-settings':
+            if (($_POST['_action'] ?? '') === 'save_vector_settings') { cr_admin_save_vector_settings(); }
+            break;
+        case 'security':
+            if (($_POST['_action'] ?? '') === 'save_security') { cr_admin_save_security(); }
+            break;
+        case 'media':
+            if (($_POST['_action'] ?? '') === 'upload_media') { cr_admin_upload_media(); }
             break;
         case 'term-edit':
             cr_admin_save_term();
@@ -202,6 +225,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Handle user delete
+if ($admin_action === 'delete' && $page === 'users') {
+    $del_id = (int) ($_GET['id'] ?? 0);
+    if ($del_id && $del_id !== get_current_user_id() && current_user_can('delete_users')) {
+        $db = cr_db();
+        $db->delete($db->prefix . 'users', ['ID' => $del_id]);
+        $db->query($db->prepare("DELETE FROM `{$db->prefix}usermeta` WHERE user_id = %d", $del_id));
+        header('Location: ' . CR_SITE_URL . '/admin/?page=users&msg=deleted');
+        exit;
+    }
+}
+
+// Handle plugin activate/deactivate
+if ($page === 'plugins' && ($admin_action === 'activate' || $admin_action === 'deactivate')) {
+    $plugin = $_GET['plugin'] ?? '';
+    if ($plugin && current_user_can('activate_plugins')) {
+        if ($admin_action === 'activate') cr_admin_activate_plugin($plugin);
+        else cr_admin_deactivate_plugin($plugin);
+    }
+}
+
+// Handle theme switch
+if ($page === 'themes' && $admin_action === 'switch') {
+    $theme = $_GET['theme'] ?? '';
+    if ($theme && current_user_can('switch_themes')) { cr_admin_switch_theme($theme); }
+}
+
+// Handle comment actions
+if ($page === 'comments' && in_array($admin_action, ['approve', 'spam', 'delete'])) {
+    $cid = (int) ($_GET['id'] ?? 0);
+    if ($cid && current_user_can('moderate_comments')) {
+        $db = cr_db();
+        if ($admin_action === 'approve') $db->update($db->prefix . 'comments', ['comment_approved' => '1'], ['comment_ID' => $cid]);
+        elseif ($admin_action === 'spam') $db->update($db->prefix . 'comments', ['comment_approved' => 'spam'], ['comment_ID' => $cid]);
+        elseif ($admin_action === 'delete') $db->delete($db->prefix . 'comments', ['comment_ID' => $cid]);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=comments&msg=updated');
+        exit;
+    }
+}
+
+// Handle media delete
+if ($page === 'media' && $admin_action === 'delete') {
+    $mid = (int) ($_GET['id'] ?? 0);
+    if ($mid && current_user_can('upload_files')) {
+        cr_delete_post($mid, true);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=media&msg=deleted');
+        exit;
+    }
+}
+
+// Handle queue actions
+if ($page === 'queue' && $admin_action === 'retry') {
+    $jid = (int) ($_GET['id'] ?? 0);
+    if ($jid) { CR_Queue::retry_job($jid); header('Location: ' . CR_SITE_URL . '/admin/?page=queue&msg=retried'); exit; }
+}
+if ($page === 'queue' && $admin_action === 'cleanup') {
+    CR_Queue::cleanup(7); header('Location: ' . CR_SITE_URL . '/admin/?page=queue&msg=cleaned'); exit;
+}
+
+// Handle vector reindex
+if ($page === 'vector-settings' && $admin_action === 'reindex') {
+    cr_vectors()->reindex_all('post');
+    header('Location: ' . CR_SITE_URL . '/admin/?page=vector-settings&msg=reindexed');
+    exit;
+}
+
 // Handle field group delete
 if ($admin_action === 'delete' && $page === 'field-groups') {
     $del_id = (int) ($_GET['id'] ?? 0);
@@ -273,6 +362,17 @@ function cr_admin_page(string $page): void {
         'categories'             => fn() => cr_admin_taxonomy_list('category'),
         'tags'                   => fn() => cr_admin_taxonomy_list('post_tag'),
         'term-edit'              => fn() => cr_admin_term_edit(),
+        'users'                  => fn() => cr_admin_users_list(),
+        'user-edit'              => fn() => cr_admin_user_edit(),
+        'plugins'                => fn() => cr_admin_plugins_list(),
+        'themes'                 => fn() => cr_admin_themes_list(),
+        'ai-settings'            => fn() => cr_admin_ai_settings(),
+        'guidelines'             => fn() => cr_admin_guidelines(),
+        'vector-settings'        => fn() => cr_admin_vector_settings(),
+        'queue'                  => fn() => cr_admin_queue_monitor(),
+        'security'               => fn() => cr_admin_security_settings(),
+        'comments'               => fn() => cr_admin_comments(),
+        'media'                  => fn() => cr_admin_media(),
         'field-groups'           => fn() => cr_admin_field_groups_list(),
         'field-group-edit'       => fn() => cr_admin_field_group_edit(),
         'content-types'          => fn() => cr_admin_content_types_list(),
@@ -326,6 +426,7 @@ function cr_admin_header(string $current_page): void {
             <div class="nav-separator"></div>
             <a href="?page=posts" class="<?php echo $current_page === 'posts' ? 'active' : ''; ?>">Posts</a>
             <a href="?page=pages" class="<?php echo $current_page === 'pages' ? 'active' : ''; ?>">Pages</a>
+            <a href="?page=media" class="<?php echo $current_page === 'media' ? 'active' : ''; ?>">Media</a>
             <?php
             $custom_types = cr_get_content_types();
             foreach ($custom_types as $ct):
@@ -338,12 +439,23 @@ function cr_admin_header(string $current_page): void {
             <div class="nav-separator"></div>
             <a href="?page=categories" class="<?php echo $current_page === 'categories' ? 'active' : ''; ?>">Categories</a>
             <a href="?page=tags" class="<?php echo $current_page === 'tags' ? 'active' : ''; ?>">Tags</a>
+            <a href="?page=comments" class="<?php echo $current_page === 'comments' ? 'active' : ''; ?>">Comments</a>
             <div class="nav-separator"></div>
             <a href="?page=content-types" class="<?php echo str_starts_with($current_page, 'content-type') ? 'active' : ''; ?>">Content Types</a>
             <a href="?page=content-taxonomies" class="<?php echo str_starts_with($current_page, 'content-taxonom') ? 'active' : ''; ?>">Taxonomies</a>
             <a href="?page=field-groups" class="<?php echo str_starts_with($current_page, 'field-group') ? 'active' : ''; ?>">Field Groups</a>
             <a href="?page=meta-fields" class="<?php echo str_starts_with($current_page, 'meta-field') ? 'active' : ''; ?>">Meta Fields</a>
             <div class="nav-separator"></div>
+            <a href="?page=users" class="<?php echo $current_page === 'users' || $current_page === 'user-edit' ? 'active' : ''; ?>">Users</a>
+            <a href="?page=plugins" class="<?php echo $current_page === 'plugins' ? 'active' : ''; ?>">Plugins</a>
+            <a href="?page=themes" class="<?php echo $current_page === 'themes' ? 'active' : ''; ?>">Themes</a>
+            <div class="nav-separator"></div>
+            <a href="?page=ai-settings" class="<?php echo $current_page === 'ai-settings' ? 'active' : ''; ?>">AI Settings</a>
+            <a href="?page=guidelines" class="<?php echo $current_page === 'guidelines' ? 'active' : ''; ?>">Guidelines</a>
+            <a href="?page=vector-settings" class="<?php echo $current_page === 'vector-settings' ? 'active' : ''; ?>">Vector Search</a>
+            <div class="nav-separator"></div>
+            <a href="?page=queue" class="<?php echo $current_page === 'queue' ? 'active' : ''; ?>">Queue</a>
+            <a href="?page=security" class="<?php echo $current_page === 'security' ? 'active' : ''; ?>">Security</a>
             <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
         </nav>
         <div class="admin-user">
@@ -689,53 +801,7 @@ function cr_admin_save_post(): void {
     exit;
 }
 
-function cr_admin_settings(): void {
-?>
-    <div class="admin-header">
-        <h1>Settings</h1>
-    </div>
-
-    <form method="post" action="?page=settings">
-        <input type="hidden" name="_cr_nonce" value="<?php echo cr_create_nonce('admin_action'); ?>">
-
-        <div class="form-group">
-            <label for="blogname">Site Title</label>
-            <input type="text" id="blogname" name="blogname" value="<?php echo esc_attr(get_option('blogname')); ?>" class="input-full">
-        </div>
-
-        <div class="form-group">
-            <label for="blogdescription">Tagline</label>
-            <input type="text" id="blogdescription" name="blogdescription" value="<?php echo esc_attr(get_option('blogdescription')); ?>" class="input-full">
-        </div>
-
-        <div class="form-group">
-            <label for="admin_email">Admin Email</label>
-            <input type="email" id="admin_email" name="admin_email" value="<?php echo esc_attr(get_option('admin_email')); ?>" class="input-full">
-        </div>
-
-        <div class="form-group">
-            <label for="posts_per_page">Posts per page</label>
-            <input type="number" id="posts_per_page" name="posts_per_page" value="<?php echo esc_attr(get_option('posts_per_page', '10')); ?>" min="1" max="100" style="width:100px;">
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Save Settings</button>
-        </div>
-    </form>
-<?php
-}
-
-function cr_admin_save_settings(): void {
-    $fields = ['blogname', 'blogdescription', 'admin_email', 'posts_per_page'];
-    foreach ($fields as $field) {
-        if (isset($_POST[$field])) {
-            update_option($field, sanitize_text_field($_POST[$field]));
-        }
-    }
-
-    header('Location: ' . CR_SITE_URL . '/admin/?page=settings&msg=saved');
-    exit;
-}
+// Settings functions moved to admin/pages/settings.php
 
 function sanitize_text_field(string $str): string {
     return htmlspecialchars(strip_tags(trim($str)), ENT_QUOTES, 'UTF-8');
