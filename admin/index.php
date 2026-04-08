@@ -245,12 +245,10 @@ function cr_admin_header(string $current_page): void {
         </div>
         <nav class="admin-nav">
             <a href="?page=dashboard" class="<?php echo $current_page === 'dashboard' ? 'active' : ''; ?>">Dashboard</a>
+            <div class="nav-separator"></div>
             <a href="?page=posts" class="<?php echo $current_page === 'posts' ? 'active' : ''; ?>">Posts</a>
-            <a href="?page=categories" class="<?php echo $current_page === 'categories' ? 'active' : ''; ?> sub">Categories</a>
-            <a href="?page=tags" class="<?php echo $current_page === 'tags' ? 'active' : ''; ?> sub">Tags</a>
             <a href="?page=pages" class="<?php echo $current_page === 'pages' ? 'active' : ''; ?>">Pages</a>
             <?php
-            // Dynamic custom content type entries
             $custom_types = cr_get_content_types();
             foreach ($custom_types as $ct):
                 if ($ct->status !== 'active') continue;
@@ -260,9 +258,12 @@ function cr_admin_header(string $current_page): void {
             <a href="?page=<?php echo esc_attr($ct_page); ?>" class="<?php echo $current_page === $ct_page ? 'active' : ''; ?>"><?php echo esc_html($icon . ' ' . $ct->label); ?></a>
             <?php endforeach; ?>
             <div class="nav-separator"></div>
+            <a href="?page=categories" class="<?php echo $current_page === 'categories' ? 'active' : ''; ?>">Categories</a>
+            <a href="?page=tags" class="<?php echo $current_page === 'tags' ? 'active' : ''; ?>">Tags</a>
+            <div class="nav-separator"></div>
             <a href="?page=content-types" class="<?php echo str_starts_with($current_page, 'content-type') ? 'active' : ''; ?>">Content Types</a>
-            <a href="?page=content-taxonomies" class="<?php echo str_starts_with($current_page, 'content-taxonom') ? 'active' : ''; ?> sub">Taxonomies</a>
-            <a href="?page=meta-fields" class="<?php echo str_starts_with($current_page, 'meta-field') ? 'active' : ''; ?> sub">Meta Fields</a>
+            <a href="?page=content-taxonomies" class="<?php echo str_starts_with($current_page, 'content-taxonom') ? 'active' : ''; ?>">Taxonomies</a>
+            <a href="?page=meta-fields" class="<?php echo str_starts_with($current_page, 'meta-field') ? 'active' : ''; ?>">Meta Fields</a>
             <div class="nav-separator"></div>
             <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
         </nav>
