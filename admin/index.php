@@ -747,9 +747,10 @@ function sanitize_text_field(string $str): string {
 
 function cr_admin_taxonomy_list(string $taxonomy): void {
     $db = cr_db();
-    $label = $taxonomy === 'category' ? 'Categories' : 'Tags';
-    $page_slug = $taxonomy === 'category' ? 'categories' : 'tags';
-    $is_hierarchical = $taxonomy === 'category';
+    $tax_obj = get_taxonomy($taxonomy);
+    $label = $tax_obj ? $tax_obj->label : ucfirst($taxonomy);
+    $page_slug = $_GET['page'] ?? $taxonomy;
+    $is_hierarchical = $tax_obj ? (bool) $tax_obj->hierarchical : false;
 
     $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC']);
 
@@ -813,9 +814,10 @@ function cr_admin_taxonomy_list(string $taxonomy): void {
 function cr_admin_term_edit(): void {
     $taxonomy = $_GET['taxonomy'] ?? 'category';
     $term_id = (int) ($_GET['id'] ?? 0);
-    $is_hierarchical = $taxonomy === 'category';
-    $label = $taxonomy === 'category' ? 'Category' : 'Tag';
-    $page_slug = $taxonomy === 'category' ? 'categories' : 'tags';
+    $tax_obj = get_taxonomy($taxonomy);
+    $is_hierarchical = $tax_obj ? (bool) $tax_obj->hierarchical : false;
+    $label = $tax_obj ? ($tax_obj->label_singular ?? $tax_obj->label ?? ucfirst($taxonomy)) : ucfirst($taxonomy);
+    $page_slug = $_GET['return_page'] ?? ($taxonomy === 'category' ? 'categories' : ($taxonomy === 'post_tag' ? 'tags' : 'categories'));
 
     $term = null;
     if ($term_id) {
