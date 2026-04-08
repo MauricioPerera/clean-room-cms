@@ -220,3 +220,18 @@ CREATE TABLE IF NOT EXISTS `{prefix}meta_fields` (
     KEY `post_type` (`post_type`),
     KEY `object_type` (`object_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Content Builder: field groups (ACF-style)
+CREATE TABLE IF NOT EXISTS `{prefix}field_groups` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `label` VARCHAR(200) NOT NULL,
+    `description` TEXT,
+    `position` INT NOT NULL DEFAULT 0,
+    `location_rules` JSON NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

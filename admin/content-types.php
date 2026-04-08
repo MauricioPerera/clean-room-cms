@@ -373,9 +373,231 @@ function cr_admin_meta_field_edit(): void {
             </div>
         </div>
 
+        <?php
+        // Field Group assignment
+        $all_groups = cr_get_all_field_groups();
+        $current_group_id = (int) ($field->group_id ?? 0);
+        ?>
+        <div class="form-group">
+            <label for="mf_group_id">Field Group</label>
+            <select id="mf_group_id" name="group_id">
+                <option value="0">None (use group name text)</option>
+                <?php foreach ($all_groups as $g): ?>
+                    <option value="<?php echo $g->id; ?>" <?php echo $current_group_id === (int) $g->id ? 'selected' : ''; ?>>
+                        <?php echo esc_html($g->label); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <?php if (empty($all_groups)): ?>
+                <p class="field-desc">No field groups created yet. <a href="?page=field-group-edit">Create one</a></p>
+            <?php endif; ?>
+        </div>
+
+        <?php
+        // Conditional Logic
+        $current_conditions = $field ? (is_string($field->conditional_logic ?? '') ? json_decode($field->conditional_logic, true) : []) : [];
+        $cond_rules = $current_conditions['rules'] ?? [];
+        $cond_relation = $current_conditions['relation'] ?? 'and';
+
+        // Get all fields for the same post type (for condition source)
+        $sibling_fields = cr_get_meta_fields($field->post_type ?? '');
+        ?>
+        <div class="form-group">
+            <label>Conditional Logic</label>
+            <p class="field-desc">Show this field only when conditions are met. Leave empty to always show.</p>
+            <div style="margin-bottom:8px">
+                <label class="checkbox-label" style="display:inline-flex">
+                    <span>Match</span>
+                    <select name="cond_relation" style="margin:0 6px;width:auto">
+                        <option value="and" <?php echo $cond_relation === 'and' ? 'selected' : ''; ?>>ALL rules (AND)</option>
+                        <option value="or" <?php echo $cond_relation === 'or' ? 'selected' : ''; ?>>ANY rule (OR)</option>
+                    </select>
+                </label>
+            </div>
+            <div id="cond-rules">
+                <?php
+                $rule_idx = 0;
+                foreach ($cond_rules as $rule):
+                ?>
+                <div class="cond-rule" style="display:flex;gap:8px;margin-bottom:6px;align-items:center">
+                    <select name="cond_field[]" style="flex:1">
+                        <option value="">-- Field --</option>
+                        <?php foreach ($sibling_fields as $sf):
+                            if ($field && $sf->name === $field->name) continue;
+                        ?>
+                            <option value="<?php echo esc_attr($sf->name); ?>" <?php echo ($rule['field'] ?? '') === $sf->name ? 'selected' : ''; ?>>
+                                <?php echo esc_html($sf->label); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select name="cond_operator[]" style="width:120px">
+                        <?php foreach (['==' => 'equals', '!=' => 'not equals', '>' => 'greater', '<' => 'less', 'contains' => 'contains', 'empty' => 'is empty', 'not_empty' => 'not empty'] as $op => $lbl): ?>
+                            <option value="<?php echo $op; ?>" <?php echo ($rule['operator'] ?? '==') === $op ? 'selected' : ''; ?>><?php echo $lbl; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="text" name="cond_value[]" value="<?php echo esc_attr($rule['value'] ?? ''); ?>" placeholder="Value" style="flex:1">
+                </div>
+                <?php
+                $rule_idx++;
+                endforeach;
+                ?>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="
+                const container = document.getElementById('cond-rules');
+                const row = container.querySelector('.cond-rule');
+                if (row) { const clone = row.cloneNode(true); clone.querySelectorAll('input').forEach(i=>i.value=''); container.appendChild(clone); }
+                else { container.innerHTML = '<div class=\'cond-rule\' style=\'display:flex;gap:8px;margin-bottom:6px;align-items:center\'><select name=\'cond_field[]\' style=\'flex:1\'><option>-- Field --</option></select><select name=\'cond_operator[]\' style=\'width:120px\'><option value=\'==\'>equals</option><option value=\'!=\'>not equals</option></select><input name=\'cond_value[]\' placeholder=\'Value\' style=\'flex:1\'></div>'; }
+            ">+ Add Rule</button>
+        </div>
+
+        <?php
+        // Repeater sub-fields (only shown when field_type = repeater)
+        $current_sub_fields = [];
+        if ($field && $field->field_type === 'repeater') {
+            $opts = is_string($field->options) ? json_decode($field->options, true) : [];
+            $current_sub_fields = $opts['sub_fields'] ?? [];
+        }
+        ?>
+        <div class="form-group" id="repeater-config" style="<?php echo ($field->field_type ?? '') !== 'repeater' ? 'display:none' : ''; ?>">
+            <label>Repeater Sub-Fields</label>
+            <p class="field-desc">Define the columns that each row will contain.</p>
+            <div id="sub-fields-list">
+                <?php foreach ($current_sub_fields as $sf): ?>
+                <div style="display:flex;gap:6px;margin-bottom:4px">
+                    <input name="sub_field_name[]" value="<?php echo esc_attr($sf['name'] ?? ''); ?>" placeholder="key" style="flex:1">
+                    <input name="sub_field_label[]" value="<?php echo esc_attr($sf['label'] ?? ''); ?>" placeholder="Label" style="flex:1">
+                    <select name="sub_field_type[]" style="width:120px">
+                        <?php foreach (cr_get_field_types() as $k => $ft): ?>
+                            <option value="<?php echo $k; ?>" <?php echo ($sf['field_type'] ?? 'text') === $k ? 'selected' : ''; ?>><?php echo $ft['label']; ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="
+                const list = document.getElementById('sub-fields-list');
+                list.innerHTML += '<div style=\'display:flex;gap:6px;margin-bottom:4px\'><input name=\'sub_field_name[]\' placeholder=\'key\' style=\'flex:1\'><input name=\'sub_field_label[]\' placeholder=\'Label\' style=\'flex:1\'><select name=\'sub_field_type[]\' style=\'width:120px\'><option value=\'text\'>Text</option><option value=\'textarea\'>Textarea</option><option value=\'number\'>Number</option><option value=\'select\'>Select</option><option value=\'checkbox\'>Checkbox</option><option value=\'date\'>Date</option><option value=\'url\'>URL</option></select></div>';
+            ">+ Add Sub-Field</button>
+            <div style="margin-top:8px;display:flex;gap:12px">
+                <label style="font-weight:400;font-size:.9em">Min rows: <input type="number" name="repeater_min_rows" value="<?php echo (int) ($opts['min_rows'] ?? 0); ?>" min="0" style="width:60px"></label>
+                <label style="font-weight:400;font-size:.9em">Max rows: <input type="number" name="repeater_max_rows" value="<?php echo (int) ($opts['max_rows'] ?? 20); ?>" min="1" style="width:60px"></label>
+                <label style="font-weight:400;font-size:.9em">Button: <input type="text" name="repeater_button_label" value="<?php echo esc_attr($opts['button_label'] ?? 'Add Row'); ?>" style="width:120px"></label>
+            </div>
+        </div>
+
+        <script>
+        document.getElementById('mf_field_type')?.addEventListener('change', function() {
+            document.getElementById('repeater-config').style.display = this.value === 'repeater' ? '' : 'none';
+        });
+        </script>
+
         <div class="form-actions">
             <button type="submit" class="btn btn-primary"><?php echo $field ? 'Update Field' : 'Create Field'; ?></button>
             <a href="?page=meta-fields" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+<?php
+}
+
+// =============================================
+// Field Groups Management
+// =============================================
+
+function cr_admin_field_groups_list(): void {
+    $groups = cr_get_all_field_groups();
+    $msg = $_GET['msg'] ?? '';
+?>
+    <div class="admin-header">
+        <h1>Field Groups</h1>
+        <a href="?page=field-group-edit" class="btn btn-primary">Add New</a>
+    </div>
+
+    <?php if ($msg === 'saved'): ?><div class="admin-notice success">Group saved.</div><?php endif; ?>
+    <?php if ($msg === 'deleted'): ?><div class="admin-notice success">Group deleted.</div><?php endif; ?>
+
+    <table class="admin-table">
+        <thead><tr><th>Label</th><th>Slug</th><th>Location Rules</th><th>Fields</th><th>Position</th><th>Actions</th></tr></thead>
+        <tbody>
+        <?php foreach ($groups as $g):
+            $rules = json_decode($g->location_rules, true) ?: [];
+            $rule_labels = array_map(fn($r) => ($r['operator'] ?? '==') === '==' ? $r['value'] : 'NOT ' . $r['value'], $rules);
+            $field_count = (int) cr_db()->get_var(cr_db()->prepare("SELECT COUNT(*) FROM `" . cr_db()->prefix . "meta_fields` WHERE group_id = %d", $g->id));
+        ?>
+            <tr>
+                <td><strong><a href="?page=field-group-edit&id=<?php echo $g->id; ?>"><?php echo esc_html($g->label); ?></a></strong></td>
+                <td><code><?php echo esc_html($g->name); ?></code></td>
+                <td><?php echo $rule_labels ? esc_html(implode(', ', $rule_labels)) : '<em>All types</em>'; ?></td>
+                <td><?php echo $field_count; ?></td>
+                <td><?php echo (int) $g->position; ?></td>
+                <td>
+                    <a href="?page=field-group-edit&id=<?php echo $g->id; ?>">Edit</a>
+                    <a href="?page=field-groups&action=delete&id=<?php echo $g->id; ?>" class="text-danger" onclick="return confirm('Delete this group? Fields will be unlinked but not deleted.')">Delete</a>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (empty($groups)): ?>
+            <tr><td colspan="6">No field groups yet. Groups let you organize meta fields into panels with location rules.</td></tr>
+        <?php endif; ?>
+        </tbody>
+    </table>
+<?php
+}
+
+function cr_admin_field_group_edit(): void {
+    $id = (int) ($_GET['id'] ?? 0);
+    $group = $id ? cr_get_field_group($id) : null;
+    $all_types = cr_get_all_post_types_for_select();
+    $rules = $group ? (json_decode($group->location_rules, true) ?: []) : [];
+?>
+    <div class="admin-header">
+        <h1><?php echo $group ? 'Edit Field Group' : 'New Field Group'; ?></h1>
+    </div>
+
+    <form method="post" action="?page=field-group-edit<?php echo $group ? '&id=' . $group->id : ''; ?>">
+        <input type="hidden" name="_cr_nonce" value="<?php echo cr_create_nonce('admin_action'); ?>">
+        <input type="hidden" name="_action" value="save_field_group">
+        <?php if ($group): ?><input type="hidden" name="group_id" value="<?php echo $group->id; ?>"><?php endif; ?>
+
+        <div class="form-row">
+            <div class="form-group" style="flex:1">
+                <label for="fg_name">Slug</label>
+                <input type="text" id="fg_name" name="name" value="<?php echo esc_attr($group->name ?? ''); ?>" class="input-full" placeholder="product-details" pattern="[a-z0-9_-]+" required <?php echo $group ? 'readonly' : ''; ?>>
+            </div>
+            <div class="form-group" style="flex:1">
+                <label for="fg_label">Label</label>
+                <input type="text" id="fg_label" name="label" value="<?php echo esc_attr($group->label ?? ''); ?>" class="input-full" placeholder="Product Details" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="fg_desc">Description</label>
+            <input type="text" id="fg_desc" name="description" value="<?php echo esc_attr($group->description ?? ''); ?>" class="input-full">
+        </div>
+
+        <div class="form-group">
+            <label for="fg_position">Position</label>
+            <input type="number" id="fg_position" name="position" value="<?php echo (int) ($group->position ?? 0); ?>" min="0" style="width:100px">
+        </div>
+
+        <div class="form-group">
+            <label>Location Rules (show this group on these post types)</label>
+            <p class="field-desc">Leave empty to show on all post types. Check to restrict.</p>
+            <div class="checkbox-list" style="max-height:none">
+                <?php foreach ($all_types as $slug => $label):
+                    $checked = false;
+                    foreach ($rules as $r) { if (($r['value'] ?? '') === $slug && ($r['operator'] ?? '==') === '==') $checked = true; }
+                ?>
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="location_post_types[]" value="<?php echo esc_attr($slug); ?>" <?php echo $checked ? 'checked' : ''; ?>>
+                        <?php echo esc_html($label); ?> <code>(<?php echo $slug; ?>)</code>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary"><?php echo $group ? 'Update Group' : 'Create Group'; ?></button>
+            <a href="?page=field-groups" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
 <?php

@@ -115,6 +115,9 @@ if ($db_ok) {
     require_once __DIR__ . '/Integration/ContentBuilderTest.php';
     test_content_builder();
 
+    require_once __DIR__ . '/Integration/FieldGroupsTest.php';
+    test_field_groups();
+
     require_once __DIR__ . '/Integration/VectorsTest.php';
     test_vectors();
 
@@ -150,7 +153,7 @@ if ($db_ok) {
                   'Taxonomy System', 'Query Engine', 'User System', 'Template Engine',
                   'Plugin Sandbox', 'JSON Meta System', 'LRU Cache + Namespaced Options',
                   'Security System', 'Async Queue System',
-                  'Content Builder',
+                  'Content Builder', 'Field Groups + Conditions + Repeaters',
                   'AI Client SDK', 'Abilities API', 'Content Guidelines', 'MCP Adapter', 'Vector Search Integration',
                   'REST API'];
     $_test_total_suites += count($db_suites);

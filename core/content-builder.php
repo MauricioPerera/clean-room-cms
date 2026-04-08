@@ -316,6 +316,7 @@ function cr_get_field_types(): array {
         'range'    => ['label' => 'Range Slider',    'input' => 'range'],
         'image'    => ['label' => 'Image URL',       'input' => 'url'],
         'wysiwyg'  => ['label' => 'Rich Text',       'input' => 'textarea'],
+        'repeater' => ['label' => 'Repeater',        'input' => 'repeater'],
     ];
 }
 
@@ -496,4 +497,460 @@ function cr_get_all_post_types_for_select(): array {
     }
 
     return array_merge($builtin, $custom);
+}
+
+// =============================================
+// Field Groups (ACF-style)
+// =============================================
+
+function cr_install_field_groups_table(): void {
+    $db = cr_db();
+    $table = $db->prefix . 'field_groups';
+    if (!$db->get_var("SHOW TABLES LIKE '{$table}'")) {
+        $schema = file_get_contents(CR_BASE_PATH . '/install/schema.sql');
+        $schema = str_replace('{prefix}', $db->prefix, $schema);
+        $schema = preg_replace('/^--.*$/m', '', $schema);
+        foreach (array_filter(array_map('trim', explode(';', $schema)), fn($s) => strlen($s) > 5 && stripos($s, $table) !== false) as $sql) {
+            $db->query($sql);
+        }
+    }
+    // Add new columns to meta_fields if missing
+    $cols = $db->get_col("SHOW COLUMNS FROM `{$db->prefix}meta_fields`");
+    if (!in_array('group_id', $cols)) {
+        $db->query("ALTER TABLE `{$db->prefix}meta_fields` ADD COLUMN `group_id` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `status`");
+    }
+    if (!in_array('conditional_logic', $cols)) {
+        $db->query("ALTER TABLE `{$db->prefix}meta_fields` ADD COLUMN `conditional_logic` JSON NOT NULL DEFAULT '[]' AFTER `group_id`");
+    }
+}
+
+function cr_save_field_group(array $data): int|false {
+    $db = cr_db();
+    $table = $db->prefix . 'field_groups';
+
+    $name = preg_replace('/[^a-z0-9_-]/', '', strtolower(trim($data['name'] ?? '')));
+    if (empty($name)) return false;
+
+    $location_rules = $data['location_rules'] ?? [];
+    if (is_string($location_rules)) $location_rules = json_decode($location_rules, true) ?: [];
+
+    $row = [
+        'name'           => $name,
+        'label'          => trim($data['label'] ?? ucfirst($name)),
+        'description'    => trim($data['description'] ?? ''),
+        'position'       => (int) ($data['position'] ?? 0),
+        'location_rules' => json_encode($location_rules),
+        'status'         => $data['status'] ?? 'active',
+    ];
+
+    $id = (int) ($data['id'] ?? 0);
+    if (!$id) {
+        $existing = $db->get_var($db->prepare("SELECT id FROM `{$table}` WHERE name = %s", $name));
+        if ($existing) $id = (int) $existing;
+    }
+
+    if ($id) {
+        $db->update($table, $row, ['id' => $id]);
+        return $id;
+    }
+
+    $row['created_at'] = gmdate('Y-m-d H:i:s');
+    return $db->insert($table, $row);
+}
+
+function cr_delete_field_group(int $id): bool {
+    $db = cr_db();
+    // Unlink fields from this group (don't delete fields)
+    $db->query($db->prepare("UPDATE `{$db->prefix}meta_fields` SET group_id = 0 WHERE group_id = %d", $id));
+    return $db->delete($db->prefix . 'field_groups', ['id' => $id]) > 0;
+}
+
+function cr_get_field_groups(string $post_type = ''): array {
+    $db = cr_db();
+    $groups = $db->get_results("SELECT * FROM `{$db->prefix}field_groups` WHERE status = 'active' ORDER BY position ASC, label ASC");
+
+    if (empty($post_type)) return $groups;
+
+    return array_filter($groups, fn($g) => cr_field_group_matches($g, $post_type));
+}
+
+function cr_get_field_group(int $id): ?object {
+    $db = cr_db();
+    return $db->get_row($db->prepare("SELECT * FROM `{$db->prefix}field_groups` WHERE id = %d", $id));
+}
+
+function cr_get_all_field_groups(): array {
+    $db = cr_db();
+    return $db->get_results("SELECT * FROM `{$db->prefix}field_groups` ORDER BY position ASC, label ASC");
+}
+
+function cr_field_group_matches(object $group, string $post_type): bool {
+    $rules = json_decode($group->location_rules, true) ?: [];
+    if (empty($rules)) return true; // No rules = show everywhere
+
+    // OR logic: show if ANY rule matches
+    foreach ($rules as $rule) {
+        $param = $rule['param'] ?? '';
+        $op = $rule['operator'] ?? '==';
+        $value = $rule['value'] ?? '';
+
+        if ($param === 'post_type') {
+            if ($op === '==' && $post_type === $value) return true;
+            if ($op === '!=' && $post_type !== $value) return true;
+        }
+    }
+
+    return false;
+}
+
+// =============================================
+// Conditional Logic
+// =============================================
+
+function cr_evaluate_conditions(array $conditions, array $all_values): bool {
+    if (empty($conditions) || empty($conditions['rules'] ?? [])) return true;
+
+    $relation = strtolower($conditions['relation'] ?? 'and');
+    $rules = $conditions['rules'];
+
+    $results = [];
+    foreach ($rules as $rule) {
+        $field = $rule['field'] ?? '';
+        $op = $rule['operator'] ?? '==';
+        $expected = $rule['value'] ?? '';
+        $actual = $all_values[$field] ?? '';
+
+        $match = match ($op) {
+            '=='        => (string) $actual === (string) $expected,
+            '!='        => (string) $actual !== (string) $expected,
+            '>'         => is_numeric($actual) && is_numeric($expected) && (float) $actual > (float) $expected,
+            '<'         => is_numeric($actual) && is_numeric($expected) && (float) $actual < (float) $expected,
+            '>='        => is_numeric($actual) && is_numeric($expected) && (float) $actual >= (float) $expected,
+            '<='        => is_numeric($actual) && is_numeric($expected) && (float) $actual <= (float) $expected,
+            'contains'  => str_contains((string) $actual, (string) $expected),
+            'empty'     => empty($actual),
+            'not_empty' => !empty($actual),
+            default     => true,
+        };
+
+        $results[] = $match;
+    }
+
+    if ($relation === 'or') {
+        return in_array(true, $results, true);
+    }
+    return !in_array(false, $results, true); // AND: all must be true
+}
+
+function cr_conditions_to_js_data(array $fields): array {
+    $js_data = [];
+    foreach ($fields as $field) {
+        $conditions = is_string($field->conditional_logic ?? '') ? json_decode($field->conditional_logic, true) : ($field->conditional_logic ?? []);
+        if (!empty($conditions['rules'] ?? [])) {
+            $js_data[$field->name] = $conditions;
+        }
+    }
+    return $js_data;
+}
+
+// =============================================
+// Repeater Fields
+// =============================================
+
+function cr_render_repeater_field(array $field, array $rows = []): string {
+    $options = is_string($field['options'] ?? '') ? json_decode($field['options'], true) : ($field['options'] ?? []);
+    $sub_fields = $options['sub_fields'] ?? [];
+    $min_rows = (int) ($options['min_rows'] ?? 0);
+    $max_rows = (int) ($options['max_rows'] ?? 50);
+    $button_label = $options['button_label'] ?? 'Add Row';
+    $name = esc_attr($field['name']);
+    $label = esc_html($field['label']);
+    $req_badge = ($field['required'] ?? false) ? ' <span style="color:#d63638">*</span>' : '';
+
+    if (empty($sub_fields)) return '<p>No sub-fields defined for this repeater.</p>';
+
+    $html = '<div class="form-group meta-field repeater-field" data-field-name="' . $name . '" data-max-rows="' . $max_rows . '">';
+    $html .= '<label>' . $label . $req_badge . '</label>';
+
+    if (!empty($field['description'])) {
+        $html .= '<p class="field-desc">' . esc_html($field['description']) . '</p>';
+    }
+
+    $html .= '<div class="repeater-rows" id="repeater_' . $name . '">';
+
+    // Render existing rows
+    foreach ($rows as $i => $row) {
+        $html .= cr_render_repeater_row($name, $sub_fields, $i, $row);
+    }
+
+    $html .= '</div>';
+
+    // Add row button
+    $html .= '<button type="button" class="btn btn-secondary btn-sm repeater-add" data-repeater="' . $name . '">' . esc_html($button_label) . '</button>';
+
+    // Hidden template for JS cloning (row index = __INDEX__)
+    $html .= '<template id="tmpl_' . $name . '">';
+    $html .= cr_render_repeater_row($name, $sub_fields, '__INDEX__', []);
+    $html .= '</template>';
+
+    $html .= '</div>';
+
+    return $html;
+}
+
+function cr_render_repeater_row(string $parent_name, array $sub_fields, int|string $index, array $values): string {
+    $html = '<div class="repeater-row" data-index="' . $index . '">';
+    $html .= '<div class="repeater-row-header">';
+    $html .= '<span class="repeater-row-number">' . (is_int($index) ? $index + 1 : '') . '</span>';
+    $html .= '<button type="button" class="repeater-remove" title="Remove row">&times;</button>';
+    $html .= '</div>';
+    $html .= '<div class="repeater-row-fields">';
+
+    foreach ($sub_fields as $sf) {
+        $sf_name = "meta_{$parent_name}[{$index}][{$sf['name']}]";
+        $sf_id = "field_{$parent_name}_{$index}_{$sf['name']}";
+        $value = $values[$sf['name']] ?? ($sf['default_value'] ?? '');
+        $type = $sf['field_type'] ?? 'text';
+        $sf_label = esc_html($sf['label'] ?? $sf['name']);
+
+        $html .= '<div class="repeater-sub-field">';
+        $html .= '<label for="' . esc_attr($sf_id) . '">' . $sf_label . '</label>';
+
+        if ($type === 'textarea') {
+            $html .= '<textarea id="' . esc_attr($sf_id) . '" name="' . esc_attr($sf_name) . '" rows="3" class="input-full">' . esc_html($value) . '</textarea>';
+        } elseif ($type === 'select' && !empty($sf['options'])) {
+            $opts = is_string($sf['options']) ? json_decode($sf['options'], true) : $sf['options'];
+            $html .= '<select id="' . esc_attr($sf_id) . '" name="' . esc_attr($sf_name) . '">';
+            $html .= '<option value="">--</option>';
+            foreach ($opts as $o) {
+                $ov = is_array($o) ? ($o['value'] ?? '') : $o;
+                $ol = is_array($o) ? ($o['label'] ?? $ov) : $o;
+                $sel = $value == $ov ? ' selected' : '';
+                $html .= '<option value="' . esc_attr($ov) . '"' . $sel . '>' . esc_html($ol) . '</option>';
+            }
+            $html .= '</select>';
+        } elseif ($type === 'checkbox') {
+            $chk = $value ? ' checked' : '';
+            $html .= '<input type="checkbox" id="' . esc_attr($sf_id) . '" name="' . esc_attr($sf_name) . '" value="1"' . $chk . '>';
+        } else {
+            $input_type = cr_get_field_types()[$type]['input'] ?? 'text';
+            $html .= '<input type="' . $input_type . '" id="' . esc_attr($sf_id) . '" name="' . esc_attr($sf_name) . '" value="' . esc_attr($value) . '" class="input-full">';
+        }
+
+        $html .= '</div>';
+    }
+
+    $html .= '</div></div>';
+    return $html;
+}
+
+function cr_save_repeater_from_post(int $post_id, object $field): void {
+    $key = 'meta_' . $field->name;
+    $raw = $_POST[$key] ?? [];
+
+    if (!is_array($raw)) {
+        update_post_meta($post_id, $field->name, '[]');
+        return;
+    }
+
+    $options = is_string($field->options) ? json_decode($field->options, true) : ($field->options ?? []);
+    $sub_fields = $options['sub_fields'] ?? [];
+    $sf_names = array_map(fn($sf) => $sf['name'], $sub_fields);
+
+    // Build clean rows (only keep known sub-field keys)
+    $rows = [];
+    foreach ($raw as $i => $row_data) {
+        if (!is_array($row_data)) continue;
+        $clean_row = [];
+        foreach ($sf_names as $sf_name) {
+            $clean_row[$sf_name] = $row_data[$sf_name] ?? '';
+        }
+        // Skip completely empty rows
+        if (array_filter($clean_row, fn($v) => $v !== '') !== []) {
+            $rows[] = $clean_row;
+        }
+    }
+
+    update_post_meta($post_id, $field->name, json_encode($rows, JSON_UNESCAPED_UNICODE));
+}
+
+function cr_validate_repeater(array $field, array $rows): ?string {
+    $options = is_string($field['options'] ?? '') ? json_decode($field['options'], true) : ($field['options'] ?? []);
+    $min = (int) ($options['min_rows'] ?? 0);
+    $max = (int) ($options['max_rows'] ?? 50);
+
+    if ($field['required'] ?? false) {
+        if (empty($rows)) return "Field '{$field['label']}' requires at least one row.";
+    }
+    if ($min > 0 && count($rows) < $min) {
+        return "Field '{$field['label']}' requires at least {$min} rows.";
+    }
+    if ($max > 0 && count($rows) > $max) {
+        return "Field '{$field['label']}' allows at most {$max} rows.";
+    }
+
+    return null;
+}
+
+// =============================================
+// Updated rendering with groups + conditions + repeaters
+// =============================================
+
+function cr_render_meta_fields_form_v2(string $post_type, int $post_id = 0): string {
+    // Get field groups that match this post type
+    $groups = cr_get_field_groups($post_type);
+    $all_fields = cr_get_meta_fields($post_type);
+
+    if (empty($all_fields)) return '';
+
+    // Partition fields: grouped vs ungrouped
+    $grouped = [];   // group_id => [fields]
+    $ungrouped = [];  // fields with group_id=0
+
+    foreach ($all_fields as $field) {
+        $gid = (int) ($field->group_id ?? 0);
+        if ($gid > 0) {
+            $grouped[$gid][] = $field;
+        } else {
+            $ungrouped[] = $field;
+        }
+    }
+
+    // Collect all current values for conditional evaluation
+    $all_values = [];
+    if ($post_id) {
+        foreach ($all_fields as $f) {
+            $all_values[$f->name] = get_post_meta($post_id, $f->name, true);
+        }
+    }
+
+    // Build JS conditions data
+    $conditions_data = cr_conditions_to_js_data($all_fields);
+
+    $html = '';
+
+    // Render field groups as panels
+    foreach ($groups as $group) {
+        $group_fields = $grouped[(int) $group->id] ?? [];
+        if (empty($group_fields)) continue;
+
+        $html .= '<div class="meta-group field-group-panel" data-group-id="' . $group->id . '">';
+        $html .= '<h3 class="meta-group-title collapsible">' . esc_html($group->label) . '</h3>';
+
+        if (!empty($group->description)) {
+            $html .= '<p class="group-desc">' . esc_html($group->description) . '</p>';
+        }
+
+        $html .= '<div class="group-fields">';
+        foreach ($group_fields as $field) {
+            $html .= cr_render_field_with_conditions($field, $post_id, $all_values);
+        }
+        $html .= '</div></div>';
+    }
+
+    // Render ungrouped fields
+    if (!empty($ungrouped)) {
+        // Group by group_name for backwards compat
+        $by_name = [];
+        foreach ($ungrouped as $f) {
+            $gname = $f->group_name ?: 'Custom Fields';
+            $by_name[$gname][] = $f;
+        }
+
+        foreach ($by_name as $group_label => $fields) {
+            $html .= '<div class="meta-group">';
+            $html .= '<h3 class="meta-group-title collapsible">' . esc_html($group_label) . '</h3>';
+            $html .= '<div class="group-fields">';
+            foreach ($fields as $field) {
+                $html .= cr_render_field_with_conditions($field, $post_id, $all_values);
+            }
+            $html .= '</div></div>';
+        }
+    }
+
+    // Inject conditions data for JS
+    if (!empty($conditions_data)) {
+        $html .= '<script data-cr-conditions type="application/json">' . json_encode($conditions_data, JSON_UNESCAPED_UNICODE) . '</script>';
+    }
+
+    return $html;
+}
+
+function cr_render_field_with_conditions(object $field, int $post_id, array $all_values): string {
+    $conditions = is_string($field->conditional_logic ?? '') ? json_decode($field->conditional_logic, true) : [];
+    $cond_attr = '';
+
+    if (!empty($conditions['rules'] ?? [])) {
+        $cond_attr = ' data-conditions="' . esc_attr(json_encode($conditions)) . '"';
+
+        // Server-side: evaluate conditions for initial visibility
+        $visible = cr_evaluate_conditions($conditions, $all_values);
+        if (!$visible) {
+            $cond_attr .= ' style="display:none"';
+        }
+    }
+
+    $value = null;
+    if ($post_id) {
+        $raw = get_post_meta($post_id, $field->name, true);
+        $value = $raw;
+    }
+
+    // Repeater field
+    if ($field->field_type === 'repeater') {
+        $rows = [];
+        if ($value) {
+            $decoded = is_string($value) ? json_decode($value, true) : $value;
+            if (is_array($decoded)) $rows = $decoded;
+        }
+        $inner = cr_render_repeater_field((array) $field, $rows);
+        return '<div class="field-wrapper" data-field-name="' . esc_attr($field->name) . '"' . $cond_attr . '>' . $inner . '</div>';
+    }
+
+    // Regular field
+    $inner = cr_render_meta_field((array) $field, $value);
+    // Wrap with data-field-name for JS targeting
+    return '<div class="field-wrapper" data-field-name="' . esc_attr($field->name) . '"' . $cond_attr . '>' . $inner . '</div>';
+}
+
+/**
+ * Updated save handler — handles repeaters + conditional validation.
+ */
+function cr_save_meta_fields_from_post_v2(int $post_id, string $post_type): void {
+    $fields = cr_get_meta_fields($post_type);
+
+    // Collect all values first (for conditional evaluation)
+    $all_values = [];
+    foreach ($fields as $field) {
+        $key = 'meta_' . $field->name;
+        if ($field->field_type === 'checkbox') {
+            $all_values[$field->name] = isset($_POST[$key]) ? '1' : '0';
+        } elseif ($field->field_type === 'repeater') {
+            $all_values[$field->name] = $_POST[$key] ?? [];
+        } else {
+            $all_values[$field->name] = $_POST[$key] ?? '';
+        }
+    }
+
+    foreach ($fields as $field) {
+        // Check conditional logic — skip saving if conditions not met
+        $conditions = is_string($field->conditional_logic ?? '') ? json_decode($field->conditional_logic, true) : [];
+        if (!empty($conditions['rules'] ?? [])) {
+            if (!cr_evaluate_conditions($conditions, $all_values)) {
+                continue; // Field hidden by conditions, don't save/overwrite
+            }
+        }
+
+        if ($field->field_type === 'repeater') {
+            cr_save_repeater_from_post($post_id, $field);
+            continue;
+        }
+
+        $value = $all_values[$field->name];
+
+        $error = cr_validate_meta_field((array) $field, $value);
+        if ($error) continue;
+
+        update_post_meta($post_id, $field->name, $value);
+    }
 }

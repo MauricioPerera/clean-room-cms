@@ -136,6 +136,7 @@ function cr_bootstrap(): void {
 
     // Install content builder tables (if missing)
     cr_content_builder_install();
+    cr_install_field_groups_table();
 
     // Load DB-defined content types and taxonomies
     cr_load_db_content_types();

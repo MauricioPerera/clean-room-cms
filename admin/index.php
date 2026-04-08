@@ -63,6 +63,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         case 'term-edit':
             cr_admin_save_term();
             break;
+        case 'field-group-edit':
+            if (($_POST['_action'] ?? '') === 'save_field_group') {
+                $loc_types = $_POST['location_post_types'] ?? [];
+                $loc_rules = array_map(fn($t) => ['param' => 'post_type', 'operator' => '==', 'value' => $t], $loc_types);
+
+                cr_save_field_group([
+                    'id'             => (int) ($_POST['group_id'] ?? 0),
+                    'name'           => $_POST['name'] ?? '',
+                    'label'          => $_POST['label'] ?? '',
+                    'description'    => $_POST['description'] ?? '',
+                    'position'       => (int) ($_POST['position'] ?? 0),
+                    'location_rules' => $loc_rules,
+                ]);
+                header('Location: ' . CR_SITE_URL . '/admin/?page=field-groups&msg=saved');
+                exit;
+            }
+            break;
         case 'content-type-edit':
             if (($_POST['_action'] ?? '') === 'save_content_type') {
                 cr_save_content_type([
@@ -113,13 +130,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
 
-                cr_save_meta_field([
+                // Build conditional logic
+                $cond_fields = $_POST['cond_field'] ?? [];
+                $cond_ops = $_POST['cond_operator'] ?? [];
+                $cond_vals = $_POST['cond_value'] ?? [];
+                $cond_rules = [];
+                foreach ($cond_fields as $ci => $cf) {
+                    if (!empty($cf)) {
+                        $cond_rules[] = ['field' => $cf, 'operator' => $cond_ops[$ci] ?? '==', 'value' => $cond_vals[$ci] ?? ''];
+                    }
+                }
+                $conditional_logic = !empty($cond_rules)
+                    ? ['relation' => $_POST['cond_relation'] ?? 'and', 'rules' => $cond_rules]
+                    : [];
+
+                // Build repeater options if field_type is repeater
+                $field_type = $_POST['field_type'] ?? 'text';
+                if ($field_type === 'repeater') {
+                    $sf_names = $_POST['sub_field_name'] ?? [];
+                    $sf_labels = $_POST['sub_field_label'] ?? [];
+                    $sf_types = $_POST['sub_field_type'] ?? [];
+                    $sub_fields = [];
+                    foreach ($sf_names as $si => $sn) {
+                        if (!empty($sn)) {
+                            $sub_fields[] = [
+                                'name' => preg_replace('/[^a-z0-9_]/', '', strtolower($sn)),
+                                'label' => $sf_labels[$si] ?? $sn,
+                                'field_type' => $sf_types[$si] ?? 'text',
+                            ];
+                        }
+                    }
+                    $options = [
+                        'sub_fields' => $sub_fields,
+                        'min_rows' => (int) ($_POST['repeater_min_rows'] ?? 0),
+                        'max_rows' => (int) ($_POST['repeater_max_rows'] ?? 20),
+                        'button_label' => $_POST['repeater_button_label'] ?? 'Add Row',
+                    ];
+                }
+
+                $field_id = cr_save_meta_field([
                     'id'            => (int) ($_POST['field_id'] ?? 0),
                     'name'          => $_POST['name'] ?? '',
                     'label'         => $_POST['label'] ?? '',
                     'description'   => $_POST['description'] ?? '',
                     'post_type'     => $_POST['post_type'] ?? '',
-                    'field_type'    => $_POST['field_type'] ?? 'text',
+                    'field_type'    => $field_type,
                     'options'       => $options,
                     'default_value' => $_POST['default_value'] ?? '',
                     'placeholder'   => $_POST['placeholder'] ?? '',
@@ -130,10 +185,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'show_in_list'  => isset($_POST['show_in_list']) ? 1 : 0,
                     'searchable'    => isset($_POST['searchable']) ? 1 : 0,
                 ]);
+
+                // Save group_id and conditional_logic (columns added via ALTER)
+                if ($field_id) {
+                    $db = cr_db();
+                    $update_data = ['conditional_logic' => json_encode($conditional_logic)];
+                    if (isset($_POST['group_id'])) {
+                        $update_data['group_id'] = (int) $_POST['group_id'];
+                    }
+                    $db->update($db->prefix . 'meta_fields', $update_data, ['id' => $field_id]);
+                }
                 header('Location: ' . CR_SITE_URL . '/admin/?page=meta-fields&msg=saved');
                 exit;
             }
             break;
+    }
+}
+
+// Handle field group delete
+if ($admin_action === 'delete' && $page === 'field-groups') {
+    $del_id = (int) ($_GET['id'] ?? 0);
+    if ($del_id && current_user_can('manage_options')) {
+        cr_delete_field_group($del_id);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=field-groups&msg=deleted');
+        exit;
     }
 }
 
@@ -198,6 +273,8 @@ function cr_admin_page(string $page): void {
         'categories'             => fn() => cr_admin_taxonomy_list('category'),
         'tags'                   => fn() => cr_admin_taxonomy_list('post_tag'),
         'term-edit'              => fn() => cr_admin_term_edit(),
+        'field-groups'           => fn() => cr_admin_field_groups_list(),
+        'field-group-edit'       => fn() => cr_admin_field_group_edit(),
         'content-types'          => fn() => cr_admin_content_types_list(),
         'content-type-edit'      => fn() => cr_admin_content_type_edit(),
         'content-taxonomies'     => fn() => cr_admin_content_taxonomies_list(),
@@ -236,6 +313,7 @@ function cr_admin_header(string $current_page): void {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - <?php bloginfo('name'); ?></title>
     <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/admin.css">
+    <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/js/admin.js" defer></script>
 </head>
 <body class="admin">
 <div class="admin-layout">
@@ -263,6 +341,7 @@ function cr_admin_header(string $current_page): void {
             <div class="nav-separator"></div>
             <a href="?page=content-types" class="<?php echo str_starts_with($current_page, 'content-type') ? 'active' : ''; ?>">Content Types</a>
             <a href="?page=content-taxonomies" class="<?php echo str_starts_with($current_page, 'content-taxonom') ? 'active' : ''; ?>">Taxonomies</a>
+            <a href="?page=field-groups" class="<?php echo str_starts_with($current_page, 'field-group') ? 'active' : ''; ?>">Field Groups</a>
             <a href="?page=meta-fields" class="<?php echo str_starts_with($current_page, 'meta-field') ? 'active' : ''; ?>">Meta Fields</a>
             <div class="nav-separator"></div>
             <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
@@ -463,7 +542,7 @@ function cr_admin_post_edit(): void {
 
         <?php
         // Dynamic meta fields for this post type
-        $meta_html = cr_render_meta_fields_form($post_type, $post ? (int) $post->ID : 0);
+        $meta_html = cr_render_meta_fields_form_v2($post_type, $post ? (int) $post->ID : 0);
         if ($meta_html):
         ?>
         <div class="meta-fields-section">
@@ -601,8 +680,8 @@ function cr_admin_save_post(): void {
             }
         }
 
-        // Save custom meta fields
-        cr_save_meta_fields_from_post($post_id, $data['post_type']);
+        // Save custom meta fields (v2: groups + conditions + repeaters)
+        cr_save_meta_fields_from_post_v2($post_id, $data['post_type']);
     }
 
     $list_page = $data['post_type'] === 'page' ? 'pages' : 'posts';

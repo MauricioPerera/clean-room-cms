@@ -284,6 +284,76 @@ select {
     color: var(--color-text-light);
 }
 
+/* Collapsible group titles */
+.meta-group-title.collapsible::before {
+    content: '▼ ';
+    font-size: .7em;
+}
+.meta-group-title.collapsed::before {
+    content: '▶ ';
+}
+.group-desc { color: var(--color-text-light); font-size: .85em; margin-bottom: 12px; }
+
+/* Field wrappers for conditional logic */
+.field-wrapper { transition: opacity .15s; }
+
+/* Repeater fields */
+.repeater-field { margin-bottom: 16px; }
+.repeater-rows { margin-bottom: 8px; }
+.repeater-row {
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: #fff;
+    position: relative;
+}
+.repeater-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f0f0f1;
+}
+.repeater-row-number {
+    font-weight: 700;
+    color: var(--color-text-light);
+    font-size: .85em;
+}
+.repeater-remove {
+    background: none;
+    border: none;
+    color: var(--color-danger);
+    font-size: 1.3em;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.repeater-remove:hover { opacity: .7; }
+.repeater-row-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px 16px;
+}
+.repeater-sub-field label {
+    font-size: .8em;
+    font-weight: 600;
+    color: var(--color-text-light);
+    margin-bottom: 2px;
+    display: block;
+}
+.repeater-sub-field input,
+.repeater-sub-field select,
+.repeater-sub-field textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    font-size: .9em;
+}
+.repeater-add.btn-sm { font-size: .85em; padding: 5px 14px; }
+
 /* Sidebar submenu items */
 .admin-nav a.sub {
     padding-left: 36px;
