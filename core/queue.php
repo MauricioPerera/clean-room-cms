@@ -2,8 +2,8 @@
 /**
  * Clean Room CMS - Async Queue System
  *
- * Replaces WordPress's pseudo-cron (wp-cron) which runs on page load and
- * blocks the response. This system provides:
+ * Async job queue that processes work outside the request lifecycle.
+ * Unlike pseudo-cron approaches that run on page load, this system provides:
  *
  *   1. Database-backed job queue with priorities
  *   2. Scheduled jobs (run at specific times)
@@ -355,5 +355,5 @@ function cr_queue_process_on_shutdown(): void {
     CR_Queue::process_batch(2); // Process max 2 jobs per request
 }
 
-// Optionally process queue on shutdown (like wp-cron but limited)
+// Optionally process queue on shutdown (non-blocking, limited)
 add_action('shutdown', 'cr_queue_process_on_shutdown');

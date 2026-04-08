@@ -12,7 +12,7 @@ Every line of code is original. No external dependencies. PHP 8.2+, MySQL/MariaD
 mysql -u root -e "CREATE DATABASE cleanroom"
 
 # 2. Configure
-# Edit wp-config.php with your DB credentials
+# Edit config.php with your DB credentials
 
 # 3. Run
 php -S localhost:8080 index.php
@@ -34,7 +34,7 @@ php tests/run.php
 ```
 clean room/
   index.php                     Front controller - all requests route here
-  wp-config.php                 Database credentials, paths, constants
+  config.php                 Database credentials, paths, constants
   worker.php                    Background queue worker (cron/supervisor)
   .htaccess                     Apache URL rewriting
 
@@ -327,7 +327,7 @@ Built-in route patterns:
 | `/2026/04/07/post-slug/` | Date-based post |
 | `/page/2/` | Pagination |
 | `/admin/` | Admin panel |
-| `/wp-json/wp/v2/posts` | REST API |
+| `/api/cr/v1/posts` | REST API |
 | `/mcp/tools` | MCP Protocol |
 
 Custom rules:
@@ -419,7 +419,7 @@ add_role('moderator', 'Moderator', ['moderate_comments' => true, 'read' => true]
 
 ### 8. REST API (`api/rest-api.php`)
 
-Base URL: `/wp-json/wp/v2/`
+Base URL: `/api/cr/v1/`
 
 | Endpoint | Methods | Auth Required |
 |---|---|---|
@@ -436,9 +436,9 @@ Base URL: `/wp-json/wp/v2/`
 
 **Query parameters**: `per_page`, `page`, `search`, `orderby`, `order`, `status`, `author`, `_fields`
 
-**Response headers**: `X-WP-Total`, `X-WP-TotalPages`
+**Response headers**: `X-CR-Total`, `X-CR-TotalPages`
 
-**Authentication**: HTTP Basic Auth (username:password) or `X-WP-Nonce` header.
+**Authentication**: HTTP Basic Auth (username:password) or `X-CR-Nonce` header.
 
 **Rate limiting**: 100 requests/minute per IP (configurable via `cr_api_rate_limit` filter).
 

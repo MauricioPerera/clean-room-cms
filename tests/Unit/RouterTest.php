@@ -32,11 +32,11 @@ function test_router(): void {
     $vars = $router->parse_request();
     TestCase::assertTrue($vars['_admin'] ?? false, 'parse_request routes /admin to _admin');
 
-    // Test /wp-json path
-    $_SERVER['REQUEST_URI'] = '/wp-json/wp/v2/posts';
+    // Test /api path
+    $_SERVER['REQUEST_URI'] = '/api/cr/v1/posts';
     $router = new CR_Router();
     $vars = $router->parse_request();
-    TestCase::assertTrue($vars['_rest_api'] ?? false, 'parse_request routes /wp-json to _rest_api');
+    TestCase::assertTrue($vars['_rest_api'] ?? false, 'parse_request routes /api to _rest_api');
 
     // Test /category/slug/
     $_SERVER['REQUEST_URI'] = '/category/news/';

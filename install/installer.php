@@ -215,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === '2') {
     <div class="info">
         <p>Before proceeding, make sure you have:</p>
         <p>1. Created a MySQL database named <code><?= esc_html(DB_NAME) ?></code></p>
-        <p>2. Configured <code>wp-config.php</code> with your database credentials</p>
+        <p>2. Configured <code>config.php</code> with your database credentials</p>
     </div>
 
     <?php
@@ -224,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === '2') {
         cr_db()->connect();
         echo '<div class="success"><p>Database connection successful!</p></div>';
     } catch (Exception $e) {
-        echo '<div class="error"><p>Database connection failed: ' . esc_html($e->getMessage()) . '</p><p>Please check your <code>wp-config.php</code> settings.</p></div>';
+        echo '<div class="error"><p>Database connection failed: ' . esc_html($e->getMessage()) . '</p><p>Please check your <code>config.php</code> settings.</p></div>';
     }
     ?>
 

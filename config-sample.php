@@ -2,7 +2,7 @@
 /**
  * Clean Room CMS - Configuration File (Sample)
  *
- * Copy this file to wp-config.php and fill in the values.
+ * Copy this file to config.php and fill in the values.
  */
 
 // Database settings

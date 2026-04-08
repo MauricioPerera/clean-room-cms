@@ -7,7 +7,7 @@
  */
 
 // Load configuration and bootstrap the CMS
-require_once __DIR__ . '/wp-config.php';
+require_once __DIR__ . '/config.php';
 
 // Initialize the system
 cr_bootstrap();

@@ -1,6 +1,6 @@
 # Environment
 .claude/
-wp-config.php
+config.php
 
 # Uploads
 content/uploads/*

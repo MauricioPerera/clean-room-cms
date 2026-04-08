@@ -14,7 +14,7 @@ function test_rest_api(): void {
     require_once CR_BASE_PATH . '/api/rest-api.php';
     $api = new CR_REST_API();
 
-    // GET /wp/v2/posts
+    // GET /cr/v1/posts
     $result = $api->get_posts(['post_type' => 'post', 'status' => 'publish']);
     TestCase::assertIsArray($result, 'GET posts returns array');
     TestCase::assertGreaterThan(0, count($result), 'GET posts returns results');
@@ -27,12 +27,12 @@ function test_rest_api(): void {
     TestCase::assertTrue(isset($first['slug']), 'Post has slug field');
     TestCase::assertTrue(isset($first['status']), 'Post has status field');
 
-    // GET /wp/v2/posts/{id}
+    // GET /cr/v1/posts/{id}
     $post = $api->get_post(['id' => $first['id']]);
     TestCase::assertIsArray($post, 'GET single post returns array');
     TestCase::assertEqual($first['id'], $post['id'], 'Single post has correct ID');
 
-    // GET /wp/v2/pages
+    // GET /cr/v1/pages
     $pages = $api->get_posts(['post_type' => 'page', 'status' => 'publish']);
     TestCase::assertIsArray($pages, 'GET pages returns array');
     $all_pages = true;
@@ -62,7 +62,7 @@ function test_rest_api(): void {
     TestCase::assertTrue(isset($settings['title']), 'Settings has title');
     TestCase::assertEqual('Test Site', $settings['title'], 'Settings title matches');
 
-    // POST /wp/v2/posts - create post
+    // POST /cr/v1/posts - create post
     $new = $api->create_post([
         'title' => 'API Created Post',
         'content' => 'Created via REST API',
@@ -73,23 +73,23 @@ function test_rest_api(): void {
     TestCase::assertEqual('API Created Post', $new['title']['rendered'], 'Created post has correct title');
     $created_id = $new['id'];
 
-    // PUT /wp/v2/posts/{id} - update post
+    // PUT /cr/v1/posts/{id} - update post
     $updated = $api->update_post([
         'id' => $created_id,
         'title' => 'Updated API Post',
     ]);
     TestCase::assertEqual('Updated API Post', $updated['title']['rendered'], 'PUT updates post title');
 
-    // DELETE /wp/v2/posts/{id}
+    // DELETE /cr/v1/posts/{id}
     $deleted = $api->delete_post_endpoint(['id' => $created_id, 'force' => true]);
     TestCase::assertTrue($deleted['deleted'] ?? false, 'DELETE returns deleted=true');
 
-    // POST /wp/v2/categories - create category
+    // POST /cr/v1/categories - create category
     $cat = $api->create_category(['name' => 'API Category']);
     TestCase::assertIsArray($cat, 'POST create category returns array');
     TestCase::assertEqual('API Category', $cat['name'], 'Created category has correct name');
 
-    // POST /wp/v2/tags - create tag
+    // POST /cr/v1/tags - create tag
     $tag = $api->create_tag(['name' => 'api-tag']);
     TestCase::assertIsArray($tag, 'POST create tag returns array');
     TestCase::assertEqual('api-tag', $tag['name'], 'Created tag has correct name');

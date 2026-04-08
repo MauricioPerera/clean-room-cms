@@ -2,13 +2,13 @@
 /**
  * Clean Room CMS - REST API
  *
- * Compatible with WordPress REST API endpoint structure (wp/v2 namespace).
+ * RESTful API for Clean Room CMS.
  * Routes: posts, pages, categories, tags, users, comments, media, settings, search.
  */
 
 class CR_REST_API {
     private array $routes = [];
-    private string $namespace = 'wp/v2';
+    private string $namespace = 'cr/v1';
 
     public function __construct() {
         $this->register_core_routes();
@@ -32,7 +32,7 @@ class CR_REST_API {
             header('Access-Control-Allow-Credentials: true');
         }
         header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-WP-Nonce');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-CR-Nonce');
 
         // Rate limiting
         if (!CR_Security::rate_limit_api()) {
@@ -47,7 +47,7 @@ class CR_REST_API {
         }
 
         // Strip prefix
-        $path = '/' . preg_replace('#^(wp-json|api)/?#', '', $path);
+        $path = '/' . preg_replace('#^api/?#', '', $path);
         if ($path === '/') $path = '';
 
         $method = strtoupper($_SERVER['REQUEST_METHOD']);
@@ -146,7 +146,7 @@ class CR_REST_API {
 
         // Nonce-based auth (for same-origin requests)
         $nonce = $_SERVER['HTTP_X_WP_NONCE'] ?? $_GET['_wpnonce'] ?? '';
-        if ($nonce && cr_verify_nonce($nonce, 'wp_rest')) {
+        if ($nonce && cr_verify_nonce($nonce, 'cr_rest')) {
             // User already set via cookie
         }
     }
@@ -240,8 +240,8 @@ class CR_REST_API {
         $query = new CR_Query($query_args);
 
         // Set pagination headers
-        header('X-WP-Total: ' . $query->found_posts);
-        header('X-WP-TotalPages: ' . $query->max_num_pages);
+        header('X-CR-Total: ' . $query->found_posts);
+        header('X-CR-TotalPages: ' . $query->max_num_pages);
 
         return array_map([$this, 'prepare_post'], $query->posts);
     }

@@ -101,7 +101,7 @@ class CR_Router {
             $mcp_path = substr($path, 3);
             return ['_mcp' => true, '_mcp_path' => trim($mcp_path, '/')];
         }
-        if (str_starts_with($path, 'wp-json') || str_starts_with($path, 'api')) {
+        if (str_starts_with($path, 'api')) {
             return ['_rest_api' => true, '_rest_path' => $path];
         }
 

@@ -17,7 +17,7 @@ RewriteRule . /index.php [L]
 Options -Indexes
 
 # Protect sensitive files
-<FilesMatch "^(wp-config\.php|\.htaccess)$">
+<FilesMatch "^(config\.php|\.htaccess)$">
     Order allow,deny
     Deny from all
 </FilesMatch>

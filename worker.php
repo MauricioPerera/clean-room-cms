@@ -14,7 +14,7 @@
  *   php worker.php --batch=10
  */
 
-require_once __DIR__ . '/wp-config.php';
+require_once __DIR__ . '/config.php';
 
 // Initialize without template loading
 cr_db()->connect();
