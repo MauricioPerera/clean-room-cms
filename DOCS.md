@@ -74,11 +74,13 @@ clean room/
   admin/
     index.php                   Admin router, post editor, taxonomy UI, login
     content-types.php           Content type, taxonomy, field group, meta field UI
-    pages/users.php             User management
+    pages/users.php             User management (CRUD + profile fields)
+    pages/roles.php             Role management + capabilities editor
     pages/plugins.php           Plugin and theme management
     pages/ai-settings.php       AI providers, guidelines, vector search config
     pages/queue.php             Queue monitor, comments, media library
     pages/settings.php          Expanded settings (general, reading, date, permalinks)
+    pages/api-docs.php          Live auto-generated API documentation
     assets/css/admin.css        Admin stylesheet
     assets/js/admin.js          Conditional logic + repeater field JS
 
@@ -91,10 +93,10 @@ clean room/
     uploads/                    Media uploads (date-based subdirectories)
 
   install/
-    schema.sql                  Database schema (16 tables)
+    schema.sql                  Database schema (17 tables)
     installer.php               Web-based installation wizard
 
-  tests/                        721 tests across 27 suites
+  tests/                        721 assertions across 27 suites
     run.php                     Test runner (standalone, no dependencies)
     TestCase.php                Assertion library
     bootstrap.php               Test environment setup and teardown
@@ -109,19 +111,19 @@ clean room/
 
 | Metric | Value |
 |--------|-------|
-| PHP files | 77 |
-| Lines of code (core + AI) | 8,317 |
-| Lines of code (admin) | 3,194 |
+| PHP files | 79 |
+| Lines of code (core + AI) | 8,500+ |
+| Lines of code (admin) | 3,600+ |
 | Lines of code (tests) | 3,562 |
 | Lines of code (vendor) | 2,809 |
-| Lines of code (total) | 20,833 |
+| Lines of code (total) | 21,802 |
 | Test suites | 27 |
 | Test assertions | 721 |
 | Pass rate | 100% |
 | Security audits passed | 2 (34 issues found + fixed) |
 | External dependencies | 0 |
 | Minimum PHP version | 8.2 |
-| Database tables | 16 |
+| Database tables | 17 |
 | Database | MySQL 8.0+ / MariaDB 10.4+ |
 
 ---
@@ -425,12 +427,45 @@ $valid = cr_verify_nonce($nonce, 'delete_post_42');
 
 Built-in roles: `administrator`, `editor`, `author`, `contributor`, `subscriber`.
 
-```php
-add_role('moderator', 'Moderator', ['moderate_comments' => true, 'read' => true]);
-```
-
 **Password hashing**: bcrypt via `password_hash()`.
 **Cookie security**: HMAC-SHA256 signed, `httponly`, `secure` flag on HTTPS, `SameSite=Lax`.
+
+### Roles Management
+
+Create and customize roles from `/admin/?page=roles` or programmatically:
+
+```php
+// Create via admin UI or save to DB
+cr_save_role_to_db([
+    'slug' => 'vendor',
+    'name' => 'Vendor',
+    'capabilities' => ['read' => true, 'edit_posts' => true, 'upload_files' => true],
+    'description' => 'External vendor with limited access',
+]);
+```
+
+Built-in roles can be customized (capabilities edited) but not deleted. Custom roles stored in `cr_roles` table, loaded on every request.
+
+Capability groups in the editor: Content, Pages, Media & Files, Users, Taxonomies, Comments, Appearance, Plugins, System.
+
+### User Profile Fields
+
+Define metadata fields per role using the existing Meta Fields system with `object_type = 'user'`:
+
+```php
+cr_save_meta_field([
+    'name'        => 'company_name',
+    'label'       => 'Company Name',
+    'field_type'  => 'text',
+    'object_type' => 'user',       // scoped to users, not posts
+    'post_type'   => 'vendor',     // only for users with 'vendor' role
+    'required'    => 1,
+]);
+```
+
+When editing a user with the matching role, profile fields render automatically below the standard fields. Values stored in `cr_usermeta`.
+
+All 16 field types are supported for profile fields: text, textarea, number, email, url, date, select, checkbox, etc.
 
 ---
 
@@ -551,9 +586,9 @@ Stored as JSON array in postmeta. JS add/remove rows with template cloning.
 | Content | Posts, Pages, Media, [Custom Types] |
 | Classification | Categories, Tags, Comments |
 | Structure | Content Types, Taxonomies, Field Groups, Meta Fields |
-| Access | Users (CRUD, roles, passwords), Plugins, Themes |
+| Access | Users (CRUD + profile fields), Roles (capabilities editor), Plugins, Themes |
 | AI | AI Settings (providers, keys), Guidelines (editorial), Vector Search (embeddings, reindex) |
-| System | Queue Monitor (jobs, retry, dead letter), Security (rate limits), Settings (general, reading, date, permalinks) |
+| System | API Docs (live auto-generated), Queue Monitor, Security (rate limits), Settings |
 
 ---
 
@@ -904,7 +939,7 @@ Base URL: `/mcp/`
 
 ## Database Schema
 
-16 tables with configurable prefix (default `cr_`):
+17 tables with configurable prefix (default `cr_`):
 
 | Table | Purpose | Key Columns |
 |---|---|---|
@@ -925,6 +960,7 @@ Base URL: `/mcp/`
 | `cr_content_taxonomies` | Custom taxonomies | name, label, hierarchical, post_types (JSON) |
 | `cr_meta_fields` | Meta field definitions | name, field_type, post_type, conditional_logic (JSON) |
 | `cr_field_groups` | Field groups | name, label, location_rules (JSON), position |
+| `cr_roles` | Custom roles | slug, name, capabilities (JSON), is_default |
 
 ---
 

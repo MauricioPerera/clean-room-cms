@@ -3,7 +3,7 @@
 Modern content management system built from scratch using [clean-room design](https://en.wikipedia.org/wiki/Clean-room_design) methodology. Every line is original. Zero external dependencies.
 
 ```
-77 PHP files · 20,833 lines · 721 tests · 27 suites · 0 dependencies · PHP 8.2+
+79 PHP files · 21,802 lines · 721 tests · 27 suites · 0 dependencies · PHP 8.2+
 ```
 
 ---
@@ -92,11 +92,11 @@ Categories · Tags · Comments
 ──────────
 Content Types · Taxonomies · Field Groups · Meta Fields
 ──────────
-Users · Plugins · Themes
+Users · Roles · Plugins · Themes
 ──────────
 AI Settings · Guidelines · Vector Search
 ──────────
-Queue · Security · Settings
+API Docs · Queue · Security · Settings
 ```
 
 ---
@@ -144,6 +144,25 @@ Features [Add Feature]
 │ 2  Title: Secure   Icon: 🔒  [×]│
 └─────────────────────────────────┘
 ```
+
+### Roles & Profile Fields
+
+Create custom roles with granular capabilities from `/admin/?page=roles`:
+
+```
+Role: Vendor
+Capabilities: read, edit_posts, upload_files
+```
+
+Then create meta fields scoped to that role (object_type = `user`, post_type = `vendor`):
+
+| Field | Type | Description |
+|---|---|---|
+| `company_name` | text | Company name |
+| `phone` | tel | Contact phone |
+| `tax_id` | text | Tax identifier |
+
+When a user is assigned the "Vendor" role, these profile fields appear automatically in their edit form. Built-in roles (administrator, editor, author, contributor, subscriber) can be customized but not deleted.
 
 ### Via API
 ```bash
