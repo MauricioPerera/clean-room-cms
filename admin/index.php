@@ -438,6 +438,19 @@ function cr_admin_header(string $current_page): void {
     <title>Admin - <?php bloginfo('name'); ?></title>
     <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/admin.css">
     <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/js/admin.js" defer></script>
+    <?php
+    // Load visual editor assets only on post-edit page when type supports 'editor'
+    if ($current_page === 'post-edit') {
+        $ve_type = $_GET['type'] ?? 'post';
+        if (!empty($_GET['id'])) { $ve_post = get_post((int) $_GET['id']); if ($ve_post) $ve_type = $ve_post->post_type; }
+        $ve_pto = get_post_type_object($ve_type);
+        if ($ve_pto && in_array('editor', (array) ($ve_pto->supports ?? []))) {
+    ?>
+    <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/vendor/vanillabuilder/vanillabuilder.css">
+    <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/visual-editor.css">
+    <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/vendor/vanillabuilder/vanillabuilder.js" defer></script>
+    <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/js/visual-editor.js" defer></script>
+    <?php } } ?>
 </head>
 <body class="admin">
 <div class="admin-layout">
@@ -657,10 +670,27 @@ function cr_admin_post_edit(): void {
             <input type="text" id="post_name" name="post_name" value="<?php echo esc_attr($post->post_name ?? ''); ?>" class="input-full" placeholder="auto-generated-from-title">
         </div>
 
-        <div class="form-group">
-            <label for="post_content">Content</label>
+        <?php
+        // Check if post type supports visual editor
+        $ve_supports = false;
+        $ve_pto = get_post_type_object($post_type);
+        if ($ve_pto) $ve_supports = in_array('editor', (array) ($ve_pto->supports ?? []));
+        $ve_post_css = ($post && $ve_supports) ? get_post_meta((int) $post->ID, '_post_css', true) : '';
+        ?>
+
+        <?php if ($ve_supports): ?>
+        <div class="editor-toggle">
+            <button type="button" class="toggle-btn active" data-mode="visual">Visual</button>
+            <button type="button" class="toggle-btn" data-mode="code">Code</button>
+        </div>
+        <div id="vanillabuilder-editor" data-post-css="<?php echo esc_attr($ve_post_css); ?>"></div>
+        <?php endif; ?>
+
+        <div class="form-group <?php echo $ve_supports ? 'editor-hidden' : ''; ?>">
+            <label for="post_content">Content<?php echo $ve_supports ? ' (HTML)' : ''; ?></label>
             <textarea id="post_content" name="post_content" rows="18" class="input-full"><?php echo esc_html($post->post_content ?? ''); ?></textarea>
         </div>
+        <input type="hidden" id="post_css" name="post_css" value="<?php echo esc_attr($ve_post_css); ?>">
 
         <div class="form-group">
             <label for="post_excerpt">Excerpt</label>
@@ -820,6 +850,14 @@ function cr_admin_save_post(): void {
 
         // Save custom meta fields (v2: groups + conditions + repeaters)
         cr_save_meta_fields_from_post_v2($post_id, $data['post_type']);
+
+        // Save visual editor CSS
+        $post_css = $_POST['post_css'] ?? '';
+        if (!empty(trim($post_css))) {
+            update_post_meta($post_id, '_post_css', strip_tags($post_css));
+        } else {
+            delete_post_meta($post_id, '_post_css');
+        }
     }
 
     $list_page = $data['post_type'] === 'page' ? 'pages' : 'posts';

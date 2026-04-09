@@ -15,6 +15,16 @@ add_action('cr_head', function () {
     cr_enqueue_style('cleanroom-default', cr_get_theme_url() . '/style.css', [], CR_VERSION);
 });
 
+// Output visual editor CSS for single posts/pages
+add_action('cr_head', function () {
+    global $cr_post;
+    if (!$cr_post || !(is_single() || is_page())) return;
+    $css = get_post_meta((int) $cr_post->ID, '_post_css', true);
+    if ($css) {
+        echo '<style id="post-visual-css">' . strip_tags($css) . '</style>' . "\n";
+    }
+});
+
 // Simple auto-paragraph filter
 add_filter('the_content', function (string $content): string {
     // Don't double-wrap if already has block-level HTML

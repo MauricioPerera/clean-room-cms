@@ -1,0 +1,933 @@
+/* =========================================================================
+ * VanillaBuilder - Main Stylesheet
+ * ========================================================================= */
+
+/* =========================================================================
+ * VanillaBuilder - CSS Custom Properties (Design Tokens)
+ * ========================================================================= */
+
+:root {
+  /* --- Primary palette --- */
+  --vb-primary-color: #6366f1;
+  --vb-primary-hover: #4f46e5;
+  --vb-primary-active: #4338ca;
+  --vb-primary-light: rgba(99, 102, 241, 0.15);
+
+  /* --- Secondary palette --- */
+  --vb-secondary-color: #64748b;
+  --vb-secondary-hover: #475569;
+  --vb-secondary-light: rgba(100, 116, 139, 0.15);
+
+  /* --- Accent / success / warning / danger --- */
+  --vb-accent-color: #06b6d4;
+  --vb-success-color: #22c55e;
+  --vb-warning-color: #f59e0b;
+  --vb-danger-color: #ef4444;
+
+  /* --- Dark theme (sidebar, panels) --- */
+  --vb-panel-bg: #1e1e2e;
+  --vb-panel-bg-secondary: #252538;
+  --vb-panel-bg-hover: #2a2a40;
+  --vb-panel-border: rgba(255, 255, 255, 0.08);
+  --vb-panel-text: #cdd6f4;
+  --vb-panel-text-muted: #6c7086;
+  --vb-panel-text-bright: #f5f5f5;
+
+  /* --- Light theme (canvas) --- */
+  --vb-canvas-bg: #f8f9fa;
+  --vb-canvas-frame-bg: #ffffff;
+
+  /* --- Typography --- */
+  --vb-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --vb-font-mono: 'SF Mono', Monaco, 'Cascadia Code', Consolas, 'Courier New', monospace;
+  --vb-font-size: 13px;
+  --vb-font-size-sm: 11px;
+  --vb-font-size-lg: 15px;
+
+  /* --- Spacing --- */
+  --vb-spacing-xs: 4px;
+  --vb-spacing-sm: 8px;
+  --vb-spacing-md: 12px;
+  --vb-spacing-lg: 16px;
+  --vb-spacing-xl: 24px;
+
+  /* --- Border radius --- */
+  --vb-radius-sm: 3px;
+  --vb-radius-md: 6px;
+  --vb-radius-lg: 10px;
+  --vb-radius-full: 9999px;
+
+  /* --- Shadows --- */
+  --vb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --vb-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --vb-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.3);
+
+  /* --- Z-index layers --- */
+  --vb-z-canvas: 1;
+  --vb-z-toolbar: 10;
+  --vb-z-panel: 20;
+  --vb-z-overlay: 50;
+  --vb-z-modal: 100;
+  --vb-z-tooltip: 200;
+
+  /* --- Transitions --- */
+  --vb-transition-fast: 0.1s ease;
+  --vb-transition-normal: 0.2s ease;
+  --vb-transition-slow: 0.3s ease;
+
+  /* --- Layout dimensions --- */
+  --vb-panel-width: 260px;
+  --vb-topbar-height: 40px;
+  --vb-toolbar-height: 36px;
+
+  /* --- Selection highlight --- */
+  --vb-highlight-color: #6366f1;
+  --vb-highlight-hover: rgba(99, 102, 241, 0.3);
+  --vb-highlight-selected: rgba(99, 102, 241, 0.6);
+
+  /* --- Input controls --- */
+  --vb-input-bg: rgba(255, 255, 255, 0.06);
+  --vb-input-border: rgba(255, 255, 255, 0.12);
+  --vb-input-border-focus: var(--vb-primary-color);
+  --vb-input-text: var(--vb-panel-text);
+  --vb-input-height: 30px;
+  --vb-input-radius: var(--vb-radius-sm);
+}
+
+/* --- Light mode override --- */
+@media (prefers-color-scheme: light) {
+  :root {
+    --vb-panel-bg: #1e1e2e;
+    --vb-panel-bg-secondary: #252538;
+    --vb-panel-text: #cdd6f4;
+    --vb-canvas-bg: #f1f5f9;
+    --vb-canvas-frame-bg: #ffffff;
+  }
+}
+
+/* =========================================================================
+ * Reset & Base
+ * ========================================================================= */
+
+.vb-editor *,
+.vb-editor *::before,
+.vb-editor *::after {
+  box-sizing: border-box;
+}
+
+.vb-editor {
+  font-family: var(--vb-font-family);
+  font-size: var(--vb-font-size);
+  color: var(--vb-panel-text);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================================================================
+ * Editor Layout
+ * ========================================================================= */
+
+.vb-editor {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vb-panel-bg);
+}
+
+.vb-editor-topbar {
+  display: flex;
+  align-items: center;
+  height: var(--vb-topbar-height);
+  background: var(--vb-panel-bg);
+  border-bottom: 1px solid var(--vb-panel-border);
+  padding: 0 var(--vb-spacing-sm);
+  z-index: var(--vb-z-toolbar);
+  flex-shrink: 0;
+}
+
+.vb-editor-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.vb-editor-sidebar-left {
+  width: var(--vb-panel-width);
+  background: var(--vb-panel-bg-secondary);
+  border-right: 1px solid var(--vb-panel-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+}
+
+.vb-editor-sidebar-right {
+  width: var(--vb-panel-width);
+  background: var(--vb-panel-bg-secondary);
+  border-left: 1px solid var(--vb-panel-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+}
+
+.vb-editor-canvas-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* =========================================================================
+ * Canvas
+ * ========================================================================= */
+
+.vb-canvas {
+  flex: 1;
+  position: relative;
+  background: var(--vb-canvas-bg);
+  overflow: hidden;
+}
+
+.vb-canvas__frames {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.vb-canvas__frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: var(--vb-canvas-frame-bg);
+  margin: 0 auto;
+  display: block;
+  transition: width var(--vb-transition-normal), height var(--vb-transition-normal);
+  box-shadow: var(--vb-shadow-md);
+}
+
+.vb-canvas__frame--centered {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* =========================================================================
+ * Panels
+ * ========================================================================= */
+
+.vb-panel {
+  padding: var(--vb-spacing-sm);
+}
+
+.vb-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vb-spacing-sm) var(--vb-spacing-md);
+  font-size: var(--vb-font-size);
+  font-weight: 600;
+  color: var(--vb-panel-text-bright);
+  border-bottom: 1px solid var(--vb-panel-border);
+  user-select: none;
+}
+
+.vb-panel__body {
+  padding: var(--vb-spacing-sm);
+}
+
+/* Panel buttons */
+.vb-panels-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--vb-panel-text-muted);
+  cursor: pointer;
+  border-radius: var(--vb-radius-sm);
+  transition: all var(--vb-transition-fast);
+  font-size: 14px;
+  padding: 0;
+}
+
+.vb-panels-btn:hover {
+  background: var(--vb-panel-bg-hover);
+  color: var(--vb-panel-text);
+}
+
+.vb-panels-btn--active {
+  background: var(--vb-primary-light);
+  color: var(--vb-primary-color);
+}
+
+/* =========================================================================
+ * Block Manager
+ * ========================================================================= */
+
+.vb-bm-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--vb-spacing-sm);
+  padding: var(--vb-spacing-sm);
+}
+
+.vb-bm-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--vb-spacing-md);
+  background: var(--vb-input-bg);
+  border: 1px solid var(--vb-panel-border);
+  border-radius: var(--vb-radius-md);
+  cursor: grab;
+  transition: all var(--vb-transition-fast);
+  min-height: 64px;
+  user-select: none;
+}
+
+.vb-bm-block:hover {
+  background: var(--vb-panel-bg-hover);
+  border-color: var(--vb-primary-color);
+  transform: translateY(-1px);
+  box-shadow: var(--vb-shadow-sm);
+}
+
+.vb-bm-block:active {
+  cursor: grabbing;
+  transform: scale(0.96);
+}
+
+.vb-bm-block-media {
+  font-size: 22px;
+  margin-bottom: var(--vb-spacing-xs);
+  opacity: 0.8;
+}
+
+.vb-bm-block-label {
+  font-size: var(--vb-font-size-sm);
+  color: var(--vb-panel-text-muted);
+  text-align: center;
+  word-break: break-word;
+}
+
+.vb-bm-block-category-title {
+  font-size: var(--vb-font-size-sm);
+  font-weight: 600;
+  color: var(--vb-panel-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: var(--vb-spacing-sm) var(--vb-spacing-sm) var(--vb-spacing-xs);
+}
+
+/* =========================================================================
+ * Layer Manager (Navigator)
+ * ========================================================================= */
+
+.vb-lm-layers {
+  font-size: var(--vb-font-size-sm);
+}
+
+.vb-lm-layers-title {
+  padding: var(--vb-spacing-sm) var(--vb-spacing-md);
+  font-weight: 600;
+  font-size: var(--vb-font-size);
+  color: var(--vb-panel-text-bright);
+  border-bottom: 1px solid var(--vb-panel-border);
+}
+
+.vb-lm-layer-header {
+  display: flex;
+  align-items: center;
+  padding: 5px var(--vb-spacing-sm);
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  user-select: none;
+  transition: background var(--vb-transition-fast);
+}
+
+.vb-lm-layer-header:hover {
+  background: var(--vb-panel-bg-hover);
+}
+
+.vb-lm-layer-header--selected {
+  background: var(--vb-primary-light);
+  color: var(--vb-panel-text-bright);
+}
+
+.vb-lm-layer-toggle {
+  margin-right: 6px;
+  font-size: 8px;
+  transition: transform var(--vb-transition-fast);
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  color: var(--vb-panel-text-muted);
+}
+
+.vb-lm-layer-icon {
+  margin-right: 6px;
+  font-size: var(--vb-font-size-sm);
+  opacity: 0.6;
+}
+
+.vb-lm-layer-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vb-lm-layer-vis {
+  cursor: pointer;
+  opacity: 0.4;
+  font-size: var(--vb-font-size-sm);
+  padding: 0 4px;
+  transition: opacity var(--vb-transition-fast);
+}
+
+.vb-lm-layer-vis:hover {
+  opacity: 0.8;
+}
+
+/* =========================================================================
+ * Style Manager
+ * ========================================================================= */
+
+.vb-sm-sector {
+  border-bottom: 1px solid var(--vb-panel-border);
+}
+
+.vb-sm-sector__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vb-spacing-sm) var(--vb-spacing-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--vb-font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--vb-panel-text-muted);
+  user-select: none;
+  transition: color var(--vb-transition-fast);
+}
+
+.vb-sm-sector__title:hover {
+  color: var(--vb-panel-text);
+}
+
+.vb-sm-sector__properties {
+  padding: var(--vb-spacing-xs) var(--vb-spacing-md) var(--vb-spacing-md);
+}
+
+.vb-sm-property {
+  margin-bottom: var(--vb-spacing-sm);
+}
+
+.vb-sm-property__label {
+  display: block;
+  font-size: var(--vb-font-size-sm);
+  color: var(--vb-panel-text-muted);
+  margin-bottom: var(--vb-spacing-xs);
+}
+
+.vb-sm-property__field {
+  width: 100%;
+}
+
+/* Style Manager Inputs */
+.vb-sm-input {
+  width: 100%;
+  height: var(--vb-input-height);
+  padding: 0 var(--vb-spacing-sm);
+  background: var(--vb-input-bg);
+  border: 1px solid var(--vb-input-border);
+  border-radius: var(--vb-input-radius);
+  color: var(--vb-input-text);
+  font-family: var(--vb-font-family);
+  font-size: var(--vb-font-size-sm);
+  outline: none;
+  transition: border-color var(--vb-transition-fast);
+}
+
+.vb-sm-input:focus {
+  border-color: var(--vb-input-border-focus);
+}
+
+.vb-sm-input--select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: var(--vb-spacing-xl);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236c7086'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.vb-sm-input--color {
+  padding: 2px;
+  height: var(--vb-input-height);
+  cursor: pointer;
+}
+
+.vb-sm-composite {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--vb-spacing-xs);
+}
+
+.vb-sm-composite--four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* =========================================================================
+ * Trait Manager
+ * ========================================================================= */
+
+.vb-tm-traits {
+  padding: var(--vb-spacing-sm);
+}
+
+.vb-tm-trait {
+  margin-bottom: var(--vb-spacing-md);
+}
+
+.vb-tm-trait__label {
+  display: block;
+  font-size: var(--vb-font-size-sm);
+  color: var(--vb-panel-text-muted);
+  margin-bottom: var(--vb-spacing-xs);
+}
+
+.vb-tm-trait__field {
+  width: 100%;
+}
+
+.vb-tm-input {
+  width: 100%;
+  height: var(--vb-input-height);
+  padding: 0 var(--vb-spacing-sm);
+  background: var(--vb-input-bg);
+  border: 1px solid var(--vb-input-border);
+  border-radius: var(--vb-input-radius);
+  color: var(--vb-input-text);
+  font-family: var(--vb-font-family);
+  font-size: var(--vb-font-size-sm);
+  outline: none;
+  transition: border-color var(--vb-transition-fast);
+}
+
+.vb-tm-input:focus {
+  border-color: var(--vb-input-border-focus);
+}
+
+.vb-tm-input--checkbox {
+  width: auto;
+  height: auto;
+  margin-right: var(--vb-spacing-sm);
+  accent-color: var(--vb-primary-color);
+}
+
+/* =========================================================================
+ * Selector Manager
+ * ========================================================================= */
+
+.vb-sel-selectors {
+  padding: var(--vb-spacing-sm);
+}
+
+.vb-sel-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--vb-spacing-sm);
+  margin: 2px;
+  background: var(--vb-primary-light);
+  color: var(--vb-primary-color);
+  border-radius: var(--vb-radius-full);
+  font-size: var(--vb-font-size-sm);
+  cursor: pointer;
+  transition: background var(--vb-transition-fast);
+}
+
+.vb-sel-tag:hover {
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.vb-sel-tag__close {
+  margin-left: 4px;
+  opacity: 0.6;
+  font-size: 10px;
+}
+
+.vb-sel-tag__close:hover {
+  opacity: 1;
+}
+
+/* =========================================================================
+ * Modal
+ * ========================================================================= */
+
+.vb-mdl-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: var(--vb-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--vb-transition-normal), visibility var(--vb-transition-normal);
+}
+
+.vb-mdl-overlay--open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.vb-mdl-dialog {
+  background: var(--vb-panel-bg);
+  border-radius: var(--vb-radius-lg);
+  box-shadow: var(--vb-shadow-lg);
+  min-width: 400px;
+  max-width: 80vw;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.95) translateY(10px);
+  transition: transform var(--vb-transition-normal);
+}
+
+.vb-mdl-overlay--open .vb-mdl-dialog {
+  transform: scale(1) translateY(0);
+}
+
+.vb-mdl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vb-spacing-md) var(--vb-spacing-lg);
+  border-bottom: 1px solid var(--vb-panel-border);
+}
+
+.vb-mdl-title {
+  font-size: var(--vb-font-size-lg);
+  font-weight: 600;
+  color: var(--vb-panel-text-bright);
+}
+
+.vb-mdl-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--vb-panel-text-muted);
+  cursor: pointer;
+  border-radius: var(--vb-radius-sm);
+  font-size: 18px;
+  transition: all var(--vb-transition-fast);
+}
+
+.vb-mdl-close:hover {
+  background: var(--vb-panel-bg-hover);
+  color: var(--vb-panel-text);
+}
+
+.vb-mdl-content {
+  padding: var(--vb-spacing-lg);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* =========================================================================
+ * Selection & Hover Highlights (Canvas overlays)
+ * ========================================================================= */
+
+.vb-cv-highlight {
+  position: absolute;
+  pointer-events: none;
+  z-index: var(--vb-z-overlay);
+}
+
+.vb-cv-highlight--hover {
+  border: 1px solid var(--vb-highlight-color);
+  background: var(--vb-highlight-hover);
+}
+
+.vb-cv-highlight--selected {
+  border: 2px solid var(--vb-highlight-color);
+  background: transparent;
+}
+
+.vb-cv-badge {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  padding: 2px 6px;
+  background: var(--vb-highlight-color);
+  color: #fff;
+  font-size: 10px;
+  font-family: var(--vb-font-family);
+  border-radius: var(--vb-radius-sm) var(--vb-radius-sm) 0 0;
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1.4;
+}
+
+/* =========================================================================
+ * Component Toolbar (appears above selected component)
+ * ========================================================================= */
+
+.vb-cv-toolbar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--vb-panel-bg);
+  border-radius: var(--vb-radius-sm);
+  box-shadow: var(--vb-shadow-md);
+  z-index: var(--vb-z-toolbar);
+  pointer-events: all;
+}
+
+.vb-cv-toolbar__btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--vb-panel-text);
+  cursor: pointer;
+  border-radius: var(--vb-radius-sm);
+  font-size: 12px;
+  transition: background var(--vb-transition-fast);
+}
+
+.vb-cv-toolbar__btn:hover {
+  background: var(--vb-panel-bg-hover);
+}
+
+.vb-cv-toolbar__btn--danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--vb-danger-color);
+}
+
+/* =========================================================================
+ * Rich Text Editor Toolbar
+ * ========================================================================= */
+
+.vb-rte-toolbar {
+  display: none;
+  position: absolute;
+  z-index: var(--vb-z-tooltip);
+  background: var(--vb-panel-bg);
+  border-radius: var(--vb-radius-md);
+  padding: var(--vb-spacing-xs);
+  box-shadow: var(--vb-shadow-lg);
+  white-space: nowrap;
+}
+
+.vb-rte-action {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--vb-panel-text);
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: 0 1px;
+  border-radius: var(--vb-radius-sm);
+  font-size: var(--vb-font-size);
+  line-height: 1;
+  transition: background var(--vb-transition-fast);
+}
+
+.vb-rte-action:hover {
+  background: var(--vb-panel-bg-hover);
+}
+
+.vb-rte-action--active {
+  background: var(--vb-primary-light);
+  color: var(--vb-primary-color);
+}
+
+/* =========================================================================
+ * Device Manager
+ * ========================================================================= */
+
+.vb-dvm-devices {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-spacing-xs);
+}
+
+.vb-dvm-device-select {
+  height: var(--vb-input-height);
+  padding: 0 var(--vb-spacing-sm);
+  background: var(--vb-input-bg);
+  border: 1px solid var(--vb-input-border);
+  border-radius: var(--vb-input-radius);
+  color: var(--vb-input-text);
+  font-family: var(--vb-font-family);
+  font-size: var(--vb-font-size-sm);
+  outline: none;
+  cursor: pointer;
+}
+
+.vb-dvm-device-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--vb-panel-text-muted);
+  cursor: pointer;
+  border-radius: var(--vb-radius-sm);
+  transition: all var(--vb-transition-fast);
+}
+
+.vb-dvm-device-btn:hover {
+  background: var(--vb-panel-bg-hover);
+  color: var(--vb-panel-text);
+}
+
+.vb-dvm-device-btn--active {
+  color: var(--vb-primary-color);
+}
+
+/* =========================================================================
+ * Resize Handles (for component resizing)
+ * ========================================================================= */
+
+.vb-cv-resizer {
+  position: absolute;
+  pointer-events: all;
+}
+
+.vb-cv-resizer--tl,
+.vb-cv-resizer--tr,
+.vb-cv-resizer--bl,
+.vb-cv-resizer--br {
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 2px solid var(--vb-highlight-color);
+  border-radius: 50%;
+}
+
+.vb-cv-resizer--tl { top: -5px; left: -5px; cursor: nw-resize; }
+.vb-cv-resizer--tr { top: -5px; right: -5px; cursor: ne-resize; }
+.vb-cv-resizer--bl { bottom: -5px; left: -5px; cursor: sw-resize; }
+.vb-cv-resizer--br { bottom: -5px; right: -5px; cursor: se-resize; }
+
+.vb-cv-resizer--t,
+.vb-cv-resizer--b {
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 6px;
+  background: #fff;
+  border: 1px solid var(--vb-highlight-color);
+  border-radius: 3px;
+}
+
+.vb-cv-resizer--t { top: -3px; cursor: n-resize; }
+.vb-cv-resizer--b { bottom: -3px; cursor: s-resize; }
+
+.vb-cv-resizer--l,
+.vb-cv-resizer--r {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 20px;
+  background: #fff;
+  border: 1px solid var(--vb-highlight-color);
+  border-radius: 3px;
+}
+
+.vb-cv-resizer--l { left: -3px; cursor: w-resize; }
+.vb-cv-resizer--r { right: -3px; cursor: e-resize; }
+
+/* =========================================================================
+ * Scrollbars (for panels)
+ * ========================================================================= */
+
+.vb-editor-sidebar-left::-webkit-scrollbar,
+.vb-editor-sidebar-right::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vb-editor-sidebar-left::-webkit-scrollbar-track,
+.vb-editor-sidebar-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vb-editor-sidebar-left::-webkit-scrollbar-thumb,
+.vb-editor-sidebar-right::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.vb-editor-sidebar-left::-webkit-scrollbar-thumb:hover,
+.vb-editor-sidebar-right::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* =========================================================================
+ * Responsive Adjustments
+ * ========================================================================= */
+
+@media (max-width: 1024px) {
+  .vb-editor-sidebar-left,
+  .vb-editor-sidebar-right {
+    width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .vb-editor-main {
+    flex-direction: column;
+  }
+
+  .vb-editor-sidebar-left,
+  .vb-editor-sidebar-right {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+    border-left: none;
+    border-right: none;
+    border-bottom: 1px solid var(--vb-panel-border);
+  }
+
+  .vb-editor-canvas-wrap {
+    min-height: 300px;
+  }
+}
+
+/* =========================================================================
+ * Utility Classes
+ * ========================================================================= */
+
+.vb-hidden { display: none !important; }
+.vb-invisible { visibility: hidden !important; }
+.vb-no-select { user-select: none !important; }
+.vb-grab { cursor: grab !important; }
+.vb-grabbing { cursor: grabbing !important; }
+.vb-no-pointer { pointer-events: none !important; }

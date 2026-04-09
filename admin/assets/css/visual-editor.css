@@ -1,0 +1,52 @@
+/* Clean Room CMS - Visual Editor Styles */
+
+/* Toggle bar */
+.editor-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.toggle-btn {
+    padding: 6px 16px;
+    border: none;
+    background: #f6f7f7;
+    color: var(--color-text-light);
+    font-size: .85em;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+}
+
+.toggle-btn:hover {
+    background: #e8e8e8;
+}
+
+.toggle-btn.active {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.toggle-btn + .toggle-btn {
+    border-left: 1px solid var(--color-border);
+}
+
+/* Editor container */
+#vanillabuilder-editor {
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+    min-height: 400px;
+    margin-bottom: 16px;
+    background: #fff;
+}
+
+/* Hide textarea when visual editor is active */
+.editor-hidden {
+    display: none !important;
+}
