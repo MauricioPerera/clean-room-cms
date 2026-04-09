@@ -249,3 +249,18 @@ CREATE TABLE IF NOT EXISTS `{prefix}roles` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Block-based templates (declarative theme system)
+CREATE TABLE IF NOT EXISTS `{prefix}templates` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(100) NOT NULL,
+    `label` VARCHAR(200) NOT NULL,
+    `description` TEXT,
+    `blocks` JSON NOT NULL,
+    `css` TEXT,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'active',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

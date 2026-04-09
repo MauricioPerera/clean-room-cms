@@ -12,6 +12,7 @@ require_once __DIR__ . '/pages/queue.php';
 require_once __DIR__ . '/pages/settings.php';
 require_once __DIR__ . '/pages/api-docs.php';
 require_once __DIR__ . '/pages/roles.php';
+require_once __DIR__ . '/pages/template-builder.php';
 
 // Auth check
 if (!is_user_logged_in()) {
@@ -87,6 +88,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         case 'media':
             if (($_POST['_action'] ?? '') === 'upload_media') { cr_admin_upload_media(); }
+            break;
+        case 'template-builder':
+            if (($_POST['_action'] ?? '') === 'save_template') { cr_admin_save_template_handler(); }
+            if (($_POST['_action'] ?? '') === 'import_theme') { cr_admin_import_theme_handler(); }
             break;
         case 'term-edit':
             cr_admin_save_term();
@@ -234,6 +239,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // CSRF nonce check for all GET-based actions
 $_action_nonce_valid = cr_verify_nonce($_GET['_nonce'] ?? '', 'admin_action');
+
+// Handle template builder actions
+if ($page === 'template-builder' && $admin_action === 'export') {
+    cr_admin_export_theme();
+}
+if ($page === 'template-builder' && $admin_action === 'delete' && $_action_nonce_valid) {
+    $tpl_name = $_GET['template'] ?? '';
+    if ($tpl_name && current_user_can('edit_theme_options')) {
+        cr_delete_block_template($tpl_name);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=template-builder&msg=deleted');
+        exit;
+    }
+}
 
 // Handle role delete
 if ($admin_action === 'delete' && $page === 'roles' && $_action_nonce_valid) {
@@ -389,6 +407,7 @@ function cr_admin_page(string $page): void {
         'role-edit'              => fn() => cr_admin_role_edit(),
         'plugins'                => fn() => cr_admin_plugins_list(),
         'themes'                 => fn() => cr_admin_themes_list(),
+        'template-builder'       => fn() => cr_admin_template_builder(),
         'ai-settings'            => fn() => cr_admin_ai_settings(),
         'guidelines'             => fn() => cr_admin_guidelines(),
         'vector-settings'        => fn() => cr_admin_vector_settings(),
@@ -449,6 +468,9 @@ function cr_admin_header(string $current_page): void {
     <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/visual-editor.css">
     <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/js/visual-editor.js" defer></script>
     <?php } } ?>
+    <?php if ($current_page === 'template-builder'): ?>
+    <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/template-builder.css">
+    <?php endif; ?>
 </head>
 <body class="admin">
 <div class="admin-layout">
@@ -485,6 +507,7 @@ function cr_admin_header(string $current_page): void {
             <a href="?page=roles" class="<?php echo $current_page === 'roles' || $current_page === 'role-edit' ? 'active' : ''; ?>">Roles</a>
             <a href="?page=plugins" class="<?php echo $current_page === 'plugins' ? 'active' : ''; ?>">Plugins</a>
             <a href="?page=themes" class="<?php echo $current_page === 'themes' ? 'active' : ''; ?>">Themes</a>
+            <a href="?page=template-builder" class="<?php echo $current_page === 'template-builder' ? 'active' : ''; ?>">Template Builder</a>
             <div class="nav-separator"></div>
             <a href="?page=ai-settings" class="<?php echo $current_page === 'ai-settings' ? 'active' : ''; ?>">AI Settings</a>
             <a href="?page=guidelines" class="<?php echo $current_page === 'guidelines' ? 'active' : ''; ?>">Guidelines</a>

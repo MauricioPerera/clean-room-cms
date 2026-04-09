@@ -153,13 +153,24 @@ function cr_get_theme_url(): string {
 function cr_load_template(string $template_path): void {
     global $cr_query, $cr_post;
 
+    // Check for block-based template override FIRST
+    $template_name = basename($template_path, '.php');
+    if (function_exists('cr_get_block_template')) {
+        $block_tpl = cr_get_block_template($template_name);
+        if ($block_tpl && $block_tpl->status === 'active') {
+            do_action('template_redirect');
+            echo cr_render_block_template($template_name);
+            return;
+        }
+    }
+
+    // Fall back to PHP file template
     $template_path = apply_filters('template_include', $template_path);
 
     if (file_exists($template_path)) {
         do_action('template_redirect');
         include $template_path;
     } else {
-        // Emergency fallback
         http_response_code(500);
         echo 'Template not found: ' . esc_html(basename($template_path));
     }

@@ -57,6 +57,9 @@ require_once CR_CORE_PATH . '/template.php';
 // 12. Shortcodes
 require_once CR_CORE_PATH . '/shortcodes.php';
 
+// 12b. Declarative Template Engine
+require_once CR_CORE_PATH . '/template-engine.php';
+
 // 13. Object Cache (LRU + namespaced options)
 require_once CR_CORE_PATH . '/cache.php';
 
@@ -141,6 +144,10 @@ function cr_bootstrap(): void {
     // Load DB-defined content types and taxonomies
     cr_load_db_content_types();
     cr_load_db_taxonomies();
+
+    // Install templates table and register block types
+    cr_install_templates_table();
+    cr_register_core_block_types();
 
     // Install and load DB roles
     cr_install_roles_table();
