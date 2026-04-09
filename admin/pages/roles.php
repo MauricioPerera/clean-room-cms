@@ -76,18 +76,7 @@ function cr_get_all_capabilities(): array {
 // Role CRUD (DB-backed)
 // =============================================
 
-function cr_install_roles_table(): void {
-    $db = cr_db();
-    $table = $db->prefix . 'roles';
-    if (!$db->get_var("SHOW TABLES LIKE '{$table}'")) {
-        $schema = file_get_contents(CR_BASE_PATH . '/install/schema.sql');
-        $schema = str_replace('{prefix}', $db->prefix, $schema);
-        $schema = preg_replace('/^--.*$/m', '', $schema);
-        foreach (array_filter(array_map('trim', explode(';', $schema)), fn($s) => strlen($s) > 5 && stripos($s, $table) !== false) as $sql) {
-            $db->query($sql);
-        }
-    }
-}
+// cr_install_roles_table() and cr_load_db_roles() are in core/user.php
 
 function cr_save_role_to_db(array $data): int|false {
     $db = cr_db();
@@ -136,20 +125,7 @@ function cr_get_db_role(string $slug): ?object {
     return $db->get_row($db->prepare("SELECT * FROM `{$db->prefix}roles` WHERE slug = %s", $slug));
 }
 
-/**
- * Load DB roles into the global $cr_roles registry.
- */
-function cr_load_db_roles(): void {
-    global $cr_roles;
-    $db_roles = cr_get_db_roles();
-    foreach ($db_roles as $r) {
-        $caps = json_decode($r->capabilities, true) ?: [];
-        $cr_roles[$r->slug] = [
-            'name' => $r->name,
-            'capabilities' => $caps,
-        ];
-    }
-}
+// cr_load_db_roles() is in core/user.php
 
 // =============================================
 // Roles Admin UI

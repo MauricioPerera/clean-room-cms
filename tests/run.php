@@ -121,6 +121,13 @@ if ($db_ok) {
     require_once __DIR__ . '/Integration/VectorsTest.php';
     test_vectors();
 
+    // Admin E2E tests
+    require_once __DIR__ . '/Integration/AdminE2ETest.php';
+    test_admin_e2e();
+    test_admin_plugins_themes();
+    test_admin_settings_ai();
+    test_admin_comments_media_queue();
+
     // ==========================================
     // PHASE 3: API Tests (need database + REST API)
     // ==========================================
@@ -155,6 +162,8 @@ if ($db_ok) {
                   'Security System', 'Async Queue System',
                   'Content Builder', 'Field Groups + Conditions + Repeaters',
                   'AI Client SDK', 'Abilities API', 'Content Guidelines', 'MCP Adapter', 'Vector Search Integration',
+                  'Admin E2E: Users + Roles + Profile Fields', 'Admin E2E: Plugins + Themes',
+                  'Admin E2E: Settings + AI + Guidelines + Vectors', 'Admin E2E: Comments + Media + Queue + Security + API Docs',
                   'REST API'];
     $_test_total_suites += count($db_suites);
 }
