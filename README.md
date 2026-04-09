@@ -3,7 +3,7 @@
 Modern content management system built from scratch using [clean-room design](https://en.wikipedia.org/wiki/Clean-room_design) methodology. Every line is original. Zero external dependencies.
 
 ```
-80 PHP files · 22,312 lines · 846 tests · 31 suites · 0 dependencies · PHP 8.2+
+82 PHP files · 24,581 lines · 846 tests · 31 suites · 0 dependencies · PHP 8.2+
 ```
 
 ---
@@ -92,7 +92,7 @@ Categories · Tags · Comments
 ──────────
 Content Types · Taxonomies · Field Groups · Meta Fields
 ──────────
-Users · Roles · Plugins · Themes
+Users · Roles · Plugins · Themes · Template Builder
 ──────────
 AI Settings · Guidelines · Vector Search
 ──────────
@@ -163,6 +163,45 @@ Then create meta fields scoped to that role (object_type = `user`, post_type = `
 | `tax_id` | text | Tax identifier |
 
 When a user is assigned the "Vendor" role, these profile fields appear automatically in their edit form. Built-in roles (administrator, editor, author, contributor, subscriber) can be customized but not deleted.
+
+### Declarative Template Builder
+
+Themes are JSON block definitions, not PHP code. Build templates visually from `/admin/?page=template-builder`:
+
+```
+Template Builder: Single Post
+┌─────────────────┐ ┌──────────────────────────────┐ ┌──────────────┐
+│ Blocks           │ │ Structure                    │ │ Configuration│
+│ SITE             │ │ ┌─ Header (site-header) ────┐│ │              │
+│ [Header][Footer] │ │ ├─ Post Title (post-title) ─┤│ │ Select a     │
+│ CONTENT          │ │ ├─ Post Meta (post-meta) ───┤│ │ block to     │
+│ [Title][Content] │ │ ├─ Post Content ────────────┤│ │ configure    │
+│ [Meta][Tags]     │ │ ├─ Post Tags ───────────────┤│ │              │
+│ LOOP             │ │ └─ Footer (site-footer) ────┘│ │              │
+│ [Post Loop]      │ │                              │ │              │
+│ [Pagination]     │ │ ▶ Custom CSS                 │ │              │
+│ LAYOUT           │ │                              │ │              │
+│ [Container]      │ │ [Save] [Delete]              │ │              │
+│ [Columns]        │ └──────────────────────────────┘ └──────────────┘
+└─────────────────┘
+```
+
+**25 block types** across 6 categories: Site, Content, Loop, Layout, Dynamic, Utility.
+
+**Template hierarchy**: `page-about` → `page` → `index` → PHP fallback. Custom types auto-generate tabs (`Single Products`, `Archive Products`). Each published page gets its own tab.
+
+**Custom CSS editor** per template. **Export/Import** themes as JSON files.
+
+```json
+// A theme is just data:
+{
+  "name": "My Theme",
+  "templates": {
+    "single": { "blocks": [{"type":"site-header"}, {"type":"post-title"}, ...] },
+    "index": { "blocks": [...] }
+  }
+}
+```
 
 ### Via API
 ```bash

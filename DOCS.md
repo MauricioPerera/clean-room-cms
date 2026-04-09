@@ -60,6 +60,7 @@ clean room/
     jsonmeta.php                JSON column metadata (modern alternative to EAV)
     queue.php                   Async job queue with retry and dead letter
     content-builder.php         DB-driven content types, taxonomies, field groups, meta fields
+    template-engine.php         Declarative block-based template renderer (25 block types)
 
   core/ai/                      AI subsystem (5 modules)
     client.php                  Provider-agnostic AI SDK (OpenAI, Anthropic, Ollama)
@@ -81,8 +82,13 @@ clean room/
     pages/queue.php             Queue monitor, comments, media library
     pages/settings.php          Expanded settings (general, reading, date, permalinks)
     pages/api-docs.php          Live auto-generated API documentation
+    pages/template-builder.php  Declarative template editor with block palette
     assets/css/admin.css        Admin stylesheet
     assets/js/admin.js          Conditional logic + repeater field JS
+    assets/js/visual-editor.js  Post content visual editor
+    assets/js/template-builder.js  Template block tree editor
+    assets/css/visual-editor.css   Content editor styles
+    assets/css/template-builder.css  Template builder styles
 
   vendor/
     php-vector-store/           Vector database library (binary Float32, BM25, hybrid)
@@ -93,7 +99,7 @@ clean room/
     uploads/                    Media uploads (date-based subdirectories)
 
   install/
-    schema.sql                  Database schema (17 tables)
+    schema.sql                  Database schema (18 tables)
     installer.php               Web-based installation wizard
 
   tests/                        846 assertions across 31 suites
@@ -111,19 +117,19 @@ clean room/
 
 | Metric | Value |
 |--------|-------|
-| PHP files | 80 |
-| Lines of code (core + AI) | 8,500+ |
-| Lines of code (admin) | 3,800+ |
+| PHP files | 82 |
+| Lines of code (core + AI) | 9,500+ |
+| Lines of code (admin) | 4,200+ |
 | Lines of code (tests) | 4,000+ |
 | Lines of code (vendor) | 2,809 |
-| Lines of code (total) | 22,312 |
+| Lines of code (total) | 24,581 |
 | Test suites | 31 |
 | Test assertions | 846 |
 | Pass rate | 100% |
 | Security audits passed | 2 (34 issues found + fixed) |
 | External dependencies | 0 |
 | Minimum PHP version | 8.2 |
-| Database tables | 17 |
+| Database tables | 18 |
 | Database | MySQL 8.0+ / MariaDB 10.4+ |
 
 ---
@@ -577,6 +583,83 @@ Stored as JSON array in postmeta. JS add/remove rows with template cloning.
 
 ---
 
+## Template Engine (`core/template-engine.php`)
+
+Declarative template system. Templates are JSON block trees stored in the database. No PHP required to create themes.
+
+### Block Types (25 registered)
+
+| Category | Blocks |
+|---|---|
+| **Site** | `site-header`, `site-footer`, `site-nav` |
+| **Content** | `post-title`, `post-content`, `post-excerpt`, `post-meta`, `post-tags`, `post-thumbnail`, `post-navigation` |
+| **Loop** | `post-loop`, `post-card`, `pagination` |
+| **Layout** | `container`, `columns`, `column`, `section`, `spacer` |
+| **Dynamic** | `search-form`, `breadcrumb`, `recent-posts`, `taxonomy-list`, `custom-html` |
+| **Utility** | `conditional`, `html-wrapper` |
+
+### Template Definition (JSON)
+```json
+[
+  {"type": "site-header", "config": {"show_nav": true}},
+  {"type": "container", "config": {"max_width": "960px"}, "children": [
+    {"type": "post-title", "config": {"tag": "h1"}},
+    {"type": "post-meta", "config": {"show_date": true, "show_author": true}},
+    {"type": "post-content"}
+  ]},
+  {"type": "site-footer", "config": {"copyright": "© {{year}} {{site_name}}"}}
+]
+```
+
+### Template Hierarchy
+Most specific template wins, then falls back to generic, then PHP files:
+```
+page-about → page → index → PHP fallback
+single-product → single → index → PHP fallback
+archive-product → archive → index → PHP fallback
+```
+
+Custom content types auto-generate hierarchy entries. Each published page gets its own slot.
+
+### Variable Interpolation
+`{{site_name}}`, `{{site_url}}`, `{{year}}`, `{{post_title}}`, `{{post_date}}`, `{{post_author}}`, `{{post_url}}`, `{{theme_url}}`
+
+### Custom CSS per Template
+Each template has a CSS textarea in the builder. Injected as `<style id="template-css">` in the document head.
+
+### Auto HTML Document Wrapping
+Block templates without an `html-wrapper` block automatically get:
+- `<!DOCTYPE html>`, `<html lang>`, `<head>` with charset, viewport, title
+- Theme stylesheet loaded
+- `cr_head()` fires (enqueued assets)
+- Body classes, `cr_footer()` fires
+
+### Theme Import/Export
+```php
+// Export all templates as JSON
+$json = cr_export_theme_json();
+
+// Import from JSON
+$count = cr_import_theme_json($data);
+```
+
+Export button in Template Builder downloads a `.json` file. Import via file upload.
+
+### Registering Custom Block Types
+```php
+cr_register_block_type('cta-button', [
+    'label'    => 'CTA Button',
+    'category' => 'dynamic',
+    'config_schema' => ['text' => 'Click Here', 'url' => '#', 'color' => '#2271b1'],
+    'render'   => function(array $config, array $context): string {
+        return '<a href="' . esc_url($config['url']) . '" class="cta-btn" style="background:' . esc_attr($config['color']) . '">'
+             . esc_html($config['text']) . '</a>';
+    },
+]);
+```
+
+---
+
 ## Admin Panel
 
 20+ pages covering every backend feature:
@@ -588,7 +671,7 @@ Stored as JSON array in postmeta. JS add/remove rows with template cloning.
 | Structure | Content Types, Taxonomies, Field Groups, Meta Fields |
 | Access | Users (CRUD + profile fields), Roles (capabilities editor), Plugins, Themes |
 | AI | AI Settings (providers, keys), Guidelines (editorial), Vector Search (embeddings, reindex) |
-| System | API Docs (live auto-generated), Queue Monitor, Security (rate limits), Settings |
+| System | API Docs, Queue Monitor, Security, Settings, Template Builder |
 
 ---
 
@@ -939,7 +1022,7 @@ Base URL: `/mcp/`
 
 ## Database Schema
 
-17 tables with configurable prefix (default `cr_`):
+18 tables with configurable prefix (default `cr_`):
 
 | Table | Purpose | Key Columns |
 |---|---|---|
@@ -961,6 +1044,7 @@ Base URL: `/mcp/`
 | `cr_meta_fields` | Meta field definitions | name, field_type, post_type, conditional_logic (JSON) |
 | `cr_field_groups` | Field groups | name, label, location_rules (JSON), position |
 | `cr_roles` | Custom roles | slug, name, capabilities (JSON), is_default |
+| `cr_templates` | Block templates | name, blocks (JSON), css, status |
 
 ---
 
