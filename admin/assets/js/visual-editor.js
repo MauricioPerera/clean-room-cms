@@ -29,10 +29,18 @@ document.addEventListener('DOMContentLoaded', () => {
             style: initialCss,
             height: '600px',
             width: '100%',
-            storageManager: false,
-            showDevices: true,
+            storageManager: { type: false },
+            showDevices: false,
             showToolbar: true,
             multipleSelection: true,
+            deviceManager: {
+                devices: [
+                    { id: 'desktop', name: 'Desktop', width: '' },
+                    { id: 'tablet', name: 'Tablet', width: '768px' },
+                    { id: 'mobile', name: 'Mobile', width: '375px' },
+                ],
+            },
+            pageManager: { pages: [] },
         });
     } catch (e) {
         console.error('VanillaBuilder init failed:', e);
