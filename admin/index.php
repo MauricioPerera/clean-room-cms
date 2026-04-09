@@ -11,6 +11,7 @@ require_once __DIR__ . '/pages/ai-settings.php';
 require_once __DIR__ . '/pages/queue.php';
 require_once __DIR__ . '/pages/settings.php';
 require_once __DIR__ . '/pages/api-docs.php';
+require_once __DIR__ . '/pages/roles.php';
 
 // Auth check
 if (!is_user_logged_in()) {
@@ -68,6 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         case 'user-edit':
             if (($_POST['_action'] ?? '') === 'save_user') { cr_admin_save_user(); }
+            break;
+        case 'role-edit':
+            if (($_POST['_action'] ?? '') === 'save_role') { cr_admin_save_role(); }
             break;
         case 'ai-settings':
             if (($_POST['_action'] ?? '') === 'save_ai_settings') { cr_admin_save_ai_settings(); }
@@ -231,6 +235,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // CSRF nonce check for all GET-based actions
 $_action_nonce_valid = cr_verify_nonce($_GET['_nonce'] ?? '', 'admin_action');
 
+// Handle role delete
+if ($admin_action === 'delete' && $page === 'roles' && $_action_nonce_valid) {
+    $del_slug = $_GET['slug'] ?? '';
+    if ($del_slug && current_user_can('promote_users')) {
+        cr_delete_role_from_db($del_slug);
+        remove_role($del_slug);
+        header('Location: ' . CR_SITE_URL . '/admin/?page=roles&msg=deleted');
+        exit;
+    }
+}
+
 // Handle user delete
 if ($admin_action === 'delete' && $page === 'users' && $_action_nonce_valid) {
     $del_id = (int) ($_GET['id'] ?? 0);
@@ -370,6 +385,8 @@ function cr_admin_page(string $page): void {
         'term-edit'              => fn() => cr_admin_term_edit(),
         'users'                  => fn() => cr_admin_users_list(),
         'user-edit'              => fn() => cr_admin_user_edit(),
+        'roles'                  => fn() => cr_admin_roles_list(),
+        'role-edit'              => fn() => cr_admin_role_edit(),
         'plugins'                => fn() => cr_admin_plugins_list(),
         'themes'                 => fn() => cr_admin_themes_list(),
         'ai-settings'            => fn() => cr_admin_ai_settings(),
@@ -454,6 +471,7 @@ function cr_admin_header(string $current_page): void {
             <a href="?page=meta-fields" class="<?php echo str_starts_with($current_page, 'meta-field') ? 'active' : ''; ?>">Meta Fields</a>
             <div class="nav-separator"></div>
             <a href="?page=users" class="<?php echo $current_page === 'users' || $current_page === 'user-edit' ? 'active' : ''; ?>">Users</a>
+            <a href="?page=roles" class="<?php echo $current_page === 'roles' || $current_page === 'role-edit' ? 'active' : ''; ?>">Roles</a>
             <a href="?page=plugins" class="<?php echo $current_page === 'plugins' ? 'active' : ''; ?>">Plugins</a>
             <a href="?page=themes" class="<?php echo $current_page === 'themes' ? 'active' : ''; ?>">Themes</a>
             <div class="nav-separator"></div>

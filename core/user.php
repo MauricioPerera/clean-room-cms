@@ -272,6 +272,33 @@ function is_admin(): bool {
 
 // -- Helpers --
 
+// -- DB-backed roles --
+
+function cr_install_roles_table(): void {
+    $db = cr_db();
+    $table = $db->prefix . 'roles';
+    if (!$db->get_var("SHOW TABLES LIKE '{$table}'")) {
+        $schema = file_get_contents(CR_BASE_PATH . '/install/schema.sql');
+        $schema = str_replace('{prefix}', $db->prefix, $schema);
+        $schema = preg_replace('/^--.*$/m', '', $schema);
+        foreach (array_filter(array_map('trim', explode(';', $schema)), fn($s) => strlen($s) > 5 && stripos($s, $table) !== false) as $sql) {
+            $db->query($sql);
+        }
+    }
+}
+
+function cr_load_db_roles(): void {
+    global $cr_roles;
+    $db = cr_db();
+    $table = $db->prefix . 'roles';
+    if (!$db->get_var("SHOW TABLES LIKE '{$table}'")) return;
+    $db_roles = $db->get_results("SELECT * FROM `{$table}` ORDER BY name ASC");
+    foreach ($db_roles as $r) {
+        $caps = json_decode($r->capabilities, true) ?: [];
+        $cr_roles[$r->slug] = ['name' => $r->name, 'capabilities' => $caps];
+    }
+}
+
 function cr_role_to_level(string $role): int {
     return match ($role) {
         'administrator' => 10,

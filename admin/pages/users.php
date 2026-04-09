@@ -94,6 +94,16 @@ function cr_admin_user_edit(): void {
             <input type="url" id="user_url" name="user_url" value="<?php echo esc_attr($user->user_url ?? ''); ?>" class="input-full">
         </div>
 
+        <?php
+        // Profile fields for this role (from meta_fields with object_type='user')
+        $profile_html = cr_render_profile_fields($current_role, $id);
+        if ($profile_html):
+        ?>
+        <div class="meta-fields-section">
+            <?php echo $profile_html; ?>
+        </div>
+        <?php endif; ?>
+
         <div class="form-actions">
             <button type="submit" class="btn btn-primary"><?php echo $user ? 'Update User' : 'Create User'; ?></button>
             <a href="?page=users" class="btn btn-secondary">Cancel</a>
@@ -127,6 +137,10 @@ function cr_admin_save_user(): void {
             exit;
         }
     }
+
+    // Save profile fields for this role
+    $role = $_POST['role'] ?? 'subscriber';
+    cr_save_profile_fields($user_id, $role);
 
     header('Location: ' . CR_SITE_URL . '/admin/?page=users&msg=saved');
     exit;

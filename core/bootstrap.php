@@ -142,6 +142,10 @@ function cr_bootstrap(): void {
     cr_load_db_content_types();
     cr_load_db_taxonomies();
 
+    // Install and load DB roles
+    cr_install_roles_table();
+    cr_load_db_roles();
+
     // Initialize AI connectors from settings
     cr_ai_init_connectors();
 

@@ -235,3 +235,17 @@ CREATE TABLE IF NOT EXISTS `{prefix}field_groups` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Custom roles
+CREATE TABLE IF NOT EXISTS `{prefix}roles` (
+    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `slug` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(200) NOT NULL,
+    `capabilities` JSON NOT NULL,
+    `description` TEXT,
+    `is_default` TINYINT(1) NOT NULL DEFAULT 0,
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
