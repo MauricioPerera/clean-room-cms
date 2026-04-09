@@ -386,7 +386,7 @@ function cr_admin_page(string $page): void {
         'content-taxonomy-edit'  => fn() => cr_admin_content_taxonomy_edit(),
         'meta-fields'            => fn() => cr_admin_meta_fields_list(),
         'meta-field-edit'        => fn() => cr_admin_meta_field_edit(),
-        'settings'               => fn() => cr_admin_settings(),
+        'settings'               => fn() => cr_admin_settings_full(),
         'dashboard'              => fn() => cr_admin_dashboard(),
         default                  => null,
     };
