@@ -153,14 +153,38 @@ function cr_get_theme_url(): string {
 function cr_load_template(string $template_path): void {
     global $cr_query, $cr_post;
 
-    // Check for block-based template override FIRST
-    $template_name = basename($template_path, '.php');
+    // Check for block-based template override FIRST (following hierarchy)
     if (function_exists('cr_get_block_template')) {
-        $block_tpl = cr_get_block_template($template_name);
-        if ($block_tpl && $block_tpl->status === 'active') {
-            do_action('template_redirect');
-            echo cr_render_block_template($template_name);
-            return;
+        global $cr_query, $cr_post;
+        $template_name = basename($template_path, '.php');
+
+        // Build hierarchy of block template names to check (most specific first)
+        $block_candidates = [];
+
+        if ($cr_query && $cr_post) {
+            $post_type = $cr_post->post_type ?? 'post';
+            $post_slug = $cr_post->post_name ?? '';
+
+            if ($cr_query->is_page && $post_slug) {
+                $block_candidates[] = 'page-' . $post_slug;    // page-about
+            }
+            if ($cr_query->is_single || $cr_query->is_page) {
+                $block_candidates[] = 'single-' . $post_type;  // single-product
+            }
+        }
+        if ($cr_query && $cr_query->is_post_type_archive) {
+            $pt = $cr_query->query_vars['post_type'] ?? 'post';
+            $block_candidates[] = 'archive-' . $pt;             // archive-product
+        }
+        $block_candidates[] = $template_name;                    // single, page, archive, index
+
+        foreach ($block_candidates as $candidate) {
+            $block_tpl = cr_get_block_template($candidate);
+            if ($block_tpl && $block_tpl->status === 'active') {
+                do_action('template_redirect');
+                echo cr_render_block_template($candidate);
+                return;
+            }
         }
     }
 

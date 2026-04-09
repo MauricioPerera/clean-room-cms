@@ -44,19 +44,47 @@ function cr_admin_template_builder(): void {
     <!-- Template tabs -->
     <div class="template-tabs">
         <?php
-        $standard = ['index' => 'Home', 'single' => 'Single Post', 'page' => 'Page', 'archive' => 'Archive', 'search' => 'Search', '404' => '404'];
-        foreach ($standard as $name => $label):
-            $exists = false;
-            foreach ($all_templates as $t) { if ($t->name === $name) { $exists = true; break; } }
+        // Build full tab list: standard + custom types + specific pages
+        $tabs = [
+            'index'   => 'Home',
+            'single'  => 'Single Post',
+            'page'    => 'Page',
+            'archive' => 'Archive',
+            'search'  => 'Search',
+            '404'     => '404',
+        ];
+
+        // Add custom post type templates
+        $custom_types = cr_get_content_types();
+        foreach ($custom_types as $ct) {
+            if ($ct->status !== 'active') continue;
+            $tabs['single-' . $ct->name] = 'Single ' . $ct->label;
+            if ($ct->has_archive) {
+                $tabs['archive-' . $ct->name] = 'Archive ' . $ct->label;
+            }
+        }
+
+        // Add specific page templates (from existing pages)
+        $db = cr_db();
+        $pages = $db->get_results("SELECT ID, post_title, post_name FROM `{$db->prefix}posts` WHERE post_type = 'page' AND post_status = 'publish' ORDER BY post_title ASC LIMIT 20");
+        foreach ($pages as $pg) {
+            $tabs['page-' . $pg->post_name] = 'Page: ' . $pg->post_title;
+        }
+
+        $existing_names = array_map(fn($t) => $t->name, $all_templates);
+
+        foreach ($tabs as $name => $label):
+            $exists = in_array($name, $existing_names);
             $active = ($template_name === $name) ? ' active' : '';
         ?>
-            <a href="?page=template-builder&template=<?php echo $name; ?>" class="template-tab<?php echo $active; ?><?php echo $exists ? ' has-template' : ''; ?>">
-                <?php echo $label; ?>
+            <a href="?page=template-builder&template=<?php echo esc_attr($name); ?>" class="template-tab<?php echo $active; ?><?php echo $exists ? ' has-template' : ''; ?>">
+                <?php echo esc_html($label); ?>
                 <?php echo $exists ? '<span class="tab-dot"></span>' : ''; ?>
             </a>
         <?php endforeach; ?>
-        <?php foreach ($all_templates as $t):
-            if (isset($standard[$t->name])) continue;
+        <?php // Show any DB templates that don't match standard tabs
+        foreach ($all_templates as $t):
+            if (isset($tabs[$t->name])) continue;
         ?>
             <a href="?page=template-builder&template=<?php echo esc_attr($t->name); ?>" class="template-tab<?php echo $template_name === $t->name ? ' active' : ''; ?> has-template">
                 <?php echo esc_html($t->label); ?><span class="tab-dot"></span>
