@@ -3,7 +3,7 @@
 Modern content management system built from scratch using [clean-room design](https://en.wikipedia.org/wiki/Clean-room_design) methodology. Every line is original. Zero external dependencies.
 
 ```
-65 PHP files  ·  12,817 lines  ·  585 tests  ·  0 dependencies  ·  PHP 8.2+
+77 PHP files · 20,833 lines · 721 tests · 27 suites · 0 dependencies · PHP 8.2+
 ```
 
 ---
@@ -12,12 +12,12 @@ Modern content management system built from scratch using [clean-room design](ht
 
 Most CMS platforms carry decades of technical debt, full-trust plugin models, and architectures that predate modern PHP. Clean Room CMS starts from zero with:
 
+- **Content Builder** — define custom types, taxonomies, and meta fields from the admin UI or API, no code needed
+- **ACF-style fields** — field groups with location rules, conditional logic (9 operators, AND/OR), repeater fields
 - **Plugin sandboxing** — 17 granular permissions per plugin, declared in `manifest.json`, admin-approved
-- **JSON metadata** — single-row-per-object alternative to the slow EAV (Entity-Attribute-Value) pattern
-- **Async job queue** — priority-based with exponential backoff retry and dead letter queue
-- **Security built-in** — CSP nonce headers, rate limiting, brute force protection, HMAC-signed cookies
-- **AI-native architecture** — provider-agnostic AI client, Abilities API, Content Guidelines, MCP server
-- **585 tests** — every public function verified, 24 suites, 100% pass rate
+- **AI-native** — provider-agnostic AI client, Abilities API, Content Guidelines, MCP server, vector search + RAG
+- **Security built-in** — CSP nonces, rate limiting, brute force protection, HMAC cookies, CSRF nonces on all actions
+- **721 tests** — every public function verified, 27 suites, 100% pass rate, 2 security audits passed
 
 ---
 
@@ -27,14 +27,11 @@ Most CMS platforms carry decades of technical debt, full-trust plugin models, an
 git clone https://github.com/MauricioPerera/clean-room-cms.git
 cd clean-room-cms
 
-# Configure
 mysql -u root -e "CREATE DATABASE cleanroom"
 cp config-sample.php config.php
 # Edit config.php with your credentials
 
-# Run
 php -S localhost:8080 index.php
-
 # Open http://localhost:8080 → installer runs automatically
 ```
 
@@ -45,7 +42,7 @@ Admin panel: `http://localhost:8080/admin/`
 ## Architecture
 
 ```
-core/                          18 modules
+core/                          19 modules
   hooks.php                    Actions & filters with priority
   database.php                 PDO abstraction, prepared statements
   options.php                  Key-value settings with autoload
@@ -63,58 +60,110 @@ core/                          18 modules
   sandbox.php                  Plugin permission enforcement
   security.php                 Headers, rate limiting, sanitization
   queue.php                    Async jobs with retry + dead letter
+  content-builder.php          DB-driven content types, taxonomies, field groups, meta fields
   bootstrap.php                Load sequence
 
-core/ai/                       4 modules
+core/ai/                       5 modules
   client.php                   AI SDK (OpenAI, Anthropic, Ollama)
   abilities.php                Capability registry + JSON Schema
   guidelines.php               Editorial standards for AI agents
   mcp.php                      Model Context Protocol server
+  vectors.php                  Semantic search + RAG (php-vector-store)
 
-api/rest-api.php               RESTful API (cr/v1 namespace)
-admin/index.php                Admin panel
+api/rest-api.php               RESTful API with dynamic routes
+admin/                         Full admin panel (20+ pages)
 content/themes/default/        Default theme (10 templates)
-install/                       Schema + web installer
-tests/                         585 assertions, 24 suites
+install/                       Schema (16 tables) + web installer
+tests/                         721 assertions, 27 suites
 ```
 
 ---
 
-## Key Features
+## Admin Panel
 
-### Content Engine
+Full management UI for every feature. No code needed for day-to-day operations.
 
-```php
-register_post_type('product', ['label' => 'Products', 'public' => true]);
-
-$id = cr_insert_post(['post_title' => 'Widget', 'post_type' => 'product', 'post_status' => 'publish']);
-
-$query = new CR_Query(['post_type' => 'product', 's' => 'widget', 'posts_per_page' => 10]);
-while (have_posts()) { the_post(); echo get_the_title(); }
+```
+Dashboard
+──────────
+Posts · Pages · Media · [Custom Types]
+──────────
+Categories · Tags · Comments
+──────────
+Content Types · Taxonomies · Field Groups · Meta Fields
+──────────
+Users · Plugins · Themes
+──────────
+AI Settings · Guidelines · Vector Search
+──────────
+Queue · Security · Settings
 ```
 
-### JSON Metadata
+---
 
-```php
-cr_post_json_set($id, ['price' => 29.99, 'specs' => ['weight' => '200g', 'color' => 'black']]);
-cr_post_json_get($id, 'specs.color');                  // 'black'
-cr_json_meta_query('post', 'price', 20, '>');          // [post IDs where price > 20]
+## Content Builder
+
+Define custom content structures entirely from the UI or API:
+
+### Custom Content Types
+```
+/admin/?page=content-types
+```
+Create "Products", "Events", "Portfolios" — with icon, supports (title, editor, thumbnail), REST API exposure, search visibility, archive pages. Auto-appears in sidebar and gets REST endpoints.
+
+### Custom Taxonomies
+```
+/admin/?page=content-taxonomies
+```
+Create "Brands", "Genres" — hierarchical or flat, linked to any post type(s). Automatically shows as checkboxes or comma input in the post editor.
+
+### Field Groups (ACF-style)
+```
+/admin/?page=field-groups
+```
+Group meta fields into collapsible panels with **location rules** (show only on specific post types).
+
+### Meta Fields
+```
+/admin/?page=meta-fields
+```
+16 field types: text, textarea, number, email, url, date, datetime, time, select, radio, checkbox, color, range, tel, image, wysiwyg, **repeater**.
+
+**Conditional Logic** per field:
+```
+Show "Weight" only when "Product Type" equals "physical"
+Show "Download URL" only when "Product Type" equals "digital"
+```
+9 operators: `==`, `!=`, `>`, `<`, `>=`, `<=`, `contains`, `empty`, `not_empty`. AND/OR relation. Real-time JS toggle + server-side validation.
+
+**Repeater Fields** — add N rows of sub-fields:
+```
+Features [Add Feature]
+┌─────────────────────────────────┐
+│ 1  Title: Fast     Icon: ⚡  [×]│
+│ 2  Title: Secure   Icon: 🔒  [×]│
+└─────────────────────────────────┘
 ```
 
-### Plugin Sandbox
+### Via API
+```bash
+# Create content type
+curl -u admin:pass -X POST /api/cr/v1/content-types \
+  -d '{"name":"product","label":"Products"}'
 
-```json
-// plugins/my-plugin/manifest.json
-{
-    "name": "My Plugin",
-    "permissions": ["options:read", "hooks:core", "http:outbound"]
-}
+# Create meta field
+curl -u admin:pass -X POST /api/cr/v1/meta-fields \
+  -d '{"name":"price","label":"Price","field_type":"number","post_type":"product"}'
+
+# Auto-generated CRUD for products
+curl /api/cr/v1/products
 ```
 
-Unauthorized actions throw `CR_Sandbox_Exception`. Admin grants permissions explicitly.
+---
 
-### AI Client
+## AI System
 
+### Provider-Agnostic Client
 ```php
 $response = cr_ai()
     ->provider('anthropic')
@@ -126,59 +175,81 @@ $response = cr_ai()
     ->send();
 ```
 
-### Abilities API
+Configure providers from `/admin/?page=ai-settings` — API keys, default model, MCP token.
 
+### Abilities API
 ```php
 register_ability('translate', [
-    'description'  => 'Translate a post',
-    'permission'   => 'edit_posts',
-    'input_schema' => ['type' => 'object', 'properties' => [
-        'post_id'  => ['type' => 'integer'],
-        'language' => ['type' => 'string', 'enum' => ['es', 'fr', 'de']],
-    ], 'required' => ['post_id', 'language']],
+    'description' => 'Translate a post',
+    'permission'  => 'edit_posts',
+    'input_schema' => [...],
     'callback' => fn($input) => ['translated' => '...'],
 ]);
-
-// AI models can discover and call this via MCP or function calling
 ```
+AI models discover and invoke abilities via function calling or MCP.
 
-### REST API
+### Content Guidelines
+Edit from `/admin/?page=guidelines` — 5 sections (site, copy, images, blocks, additional). Auto-injected into AI prompts via `->with_guidelines()`.
 
+### Vector Search + RAG
+Configure from `/admin/?page=vector-settings`. Uses [php-vector-store](https://github.com/MauricioPerera/php-vector-store) for:
+```php
+cr_vectors()->search('posts', 'How to deploy PHP apps?');  // Semantic search
+cr_vectors()->find_similar($post_id);                       // Related posts
+cr_vectors()->ask('What topics does this site cover?');     // RAG: search + AI answer
 ```
-GET    /api/cr/v1/posts
-POST   /api/cr/v1/posts           (auth required)
-GET    /api/cr/v1/posts/{id}
-PUT    /api/cr/v1/posts/{id}      (auth required)
-DELETE /api/cr/v1/posts/{id}      (auth required)
-GET    /api/cr/v1/categories
-GET    /api/cr/v1/search?search=keyword
-GET    /api/cr/v1/settings        (auth required)
-```
-
-Rate limited: 100 req/min per IP. CORS restricted to same origin.
 
 ### MCP Server
-
-External AI assistants discover site capabilities at `/mcp/`:
-
 ```
 GET  /mcp/           Server info
 GET  /mcp/tools      Available tools (from Abilities API)
 POST /mcp/execute    Invoke a tool
-GET  /mcp/resources  Site resources (guidelines, info, posts)
+GET  /mcp/resources  Site guidelines, info, recent posts
 GET  /mcp/prompts    Prompt templates
 ```
 
-### Security
+---
 
-Automatic on every request:
+## Security
+
+Built-in on every request:
 - Content-Security-Policy with nonce-based scripts
-- X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
 - Strict-Transport-Security (HTTPS)
-- Rate limiting on API and login
-- Brute force lockout (5 failures → 30 min IP ban)
-- HMAC-signed auth cookies
+- CSRF nonces on all destructive actions (GET and POST)
+- Rate limiting: API (100 req/min) + login (5 attempts/5 min)
+- Brute force lockout with configurable thresholds
+- HMAC-SHA256 signed auth cookies
+- Plugin sandbox with 17 granular permissions
 - Input sanitization by context (post/comment/title)
+- Server-side MIME validation on file uploads
+- Two security audits: 34 issues found and fixed
+
+Configure from `/admin/?page=security`.
+
+---
+
+## REST API
+
+Base: `/api/cr/v1/`
+
+| Endpoint | Methods | Auth |
+|---|---|---|
+| `/posts` | GET, POST | POST |
+| `/posts/{id}` | GET, PUT, DELETE | Write |
+| `/pages` | GET, POST | POST |
+| `/categories`, `/tags` | GET, POST | POST |
+| `/users`, `/users/me` | GET | Yes |
+| `/search?search=keyword` | GET | No |
+| `/settings` | GET, POST | Yes |
+| `/content-types` | GET, POST | Admin |
+| `/content-types/{name}` | PUT, DELETE | Admin |
+| `/meta-fields` | GET, POST | Admin |
+| `/meta-fields/{id}` | PUT, DELETE | Admin |
+| `/{custom-type}` | GET, POST, PUT, DELETE | Auto-generated |
+| `/{custom-taxonomy}` | GET, POST | Auto-generated |
+
+Headers: `X-CR-Total`, `X-CR-TotalPages`. Auth: HTTP Basic or `X-CR-Nonce`. Rate limited. CORS configurable.
 
 ---
 
@@ -188,14 +259,14 @@ Automatic on every request:
 php tests/run.php
 ```
 
-Creates isolated `cleanroom_test` database, seeds data, runs 24 suites, drops database.
+Creates isolated `cleanroom_test` database, seeds data, runs all suites, drops database.
 
 | Category | Suites | Assertions |
 |---|---|---|
 | Unit (no DB) | 6 | 83 |
-| Integration | 17 | 468 |
+| Integration | 20 | 604 |
 | API | 1 | 34 |
-| **Total** | **24** | **585** |
+| **Total** | **27** | **721** |
 
 ---
 
@@ -209,7 +280,7 @@ Creates isolated `cleanroom_test` database, seeds data, runs 24 suites, drops da
 
 ## Documentation
 
-Full API reference, configuration guide, and system documentation: **[DOCS.md](DOCS.md)**
+Full API reference and system documentation: **[DOCS.md](DOCS.md)**
 
 ---
 

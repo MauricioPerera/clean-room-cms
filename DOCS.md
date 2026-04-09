@@ -40,7 +40,7 @@ clean room/
   worker.php                    Background queue worker (cron or daemon)
   .htaccess                     Apache URL rewriting
 
-  core/                         Framework core (18 modules)
+  core/                         Framework core (19 modules)
     bootstrap.php               Load sequence and initialization
     hooks.php                   Event system (actions and filters)
     database.php                PDO abstraction with prepared statements
@@ -59,30 +59,42 @@ clean room/
     security.php                CSP headers, rate limiting, brute force protection
     jsonmeta.php                JSON column metadata (modern alternative to EAV)
     queue.php                   Async job queue with retry and dead letter
+    content-builder.php         DB-driven content types, taxonomies, field groups, meta fields
 
-  core/ai/                      AI subsystem (4 modules)
+  core/ai/                      AI subsystem (5 modules)
     client.php                  Provider-agnostic AI SDK (OpenAI, Anthropic, Ollama)
     abilities.php               Capability registry with JSON Schema validation
     guidelines.php              Editorial content standards for AI agents
     mcp.php                     Model Context Protocol server adapter
+    vectors.php                 Semantic search + RAG (php-vector-store integration)
 
   api/
-    rest-api.php                RESTful API for all content operations
+    rest-api.php                RESTful API with dynamic routes for custom types
 
   admin/
-    index.php                   Admin panel (dashboard, CRUD, settings, login)
+    index.php                   Admin router, post editor, taxonomy UI, login
+    content-types.php           Content type, taxonomy, field group, meta field UI
+    pages/users.php             User management
+    pages/plugins.php           Plugin and theme management
+    pages/ai-settings.php       AI providers, guidelines, vector search config
+    pages/queue.php             Queue monitor, comments, media library
+    pages/settings.php          Expanded settings (general, reading, date, permalinks)
     assets/css/admin.css        Admin stylesheet
+    assets/js/admin.js          Conditional logic + repeater field JS
+
+  vendor/
+    php-vector-store/           Vector database library (binary Float32, BM25, hybrid)
 
   content/
-    themes/default/             Default theme (10 template files + stylesheet)
-    plugins/                    Plugin directory
-    uploads/                    Media uploads
+    themes/default/             Default theme (10 templates + stylesheet)
+    plugins/                    Plugin directory (sandboxed)
+    uploads/                    Media uploads (date-based subdirectories)
 
   install/
-    schema.sql                  Database schema (11 tables)
+    schema.sql                  Database schema (16 tables)
     installer.php               Web-based installation wizard
 
-  tests/                        585 tests across 24 suites
+  tests/                        721 tests across 27 suites
     run.php                     Test runner (standalone, no dependencies)
     TestCase.php                Assertion library
     bootstrap.php               Test environment setup and teardown
@@ -97,16 +109,19 @@ clean room/
 
 | Metric | Value |
 |--------|-------|
-| PHP files | 65 |
-| Lines of code (core + AI) | 6,721 |
-| Lines of code (API + admin) | 955 |
-| Lines of code (tests) | 2,899 |
-| Lines of code (total project) | 12,817 |
-| Test suites | 24 |
-| Test assertions | 585 |
+| PHP files | 77 |
+| Lines of code (core + AI) | 8,317 |
+| Lines of code (admin) | 3,194 |
+| Lines of code (tests) | 3,562 |
+| Lines of code (vendor) | 2,809 |
+| Lines of code (total) | 20,833 |
+| Test suites | 27 |
+| Test assertions | 721 |
 | Pass rate | 100% |
+| Security audits passed | 2 (34 issues found + fixed) |
 | External dependencies | 0 |
 | Minimum PHP version | 8.2 |
+| Database tables | 16 |
 | Database | MySQL 8.0+ / MariaDB 10.4+ |
 
 ---
@@ -454,6 +469,91 @@ register_rest_route('myplugin/v1', '/items', [
     'permission_callback' => fn() => current_user_can('read'),
 ]);
 ```
+
+**Dynamic routes**: Custom content types with `show_in_rest = true` auto-generate CRUD endpoints. Custom taxonomies auto-generate list/create endpoints. Management API at `/content-types`, `/meta-fields` (admin auth required).
+
+---
+
+## Content Builder (`core/content-builder.php`)
+
+Define custom content structures from the admin UI or API. No PHP code needed.
+
+### Custom Content Types
+```php
+// Via API:
+cr_save_content_type([
+    'name' => 'product', 'label' => 'Products', 'icon' => '📦',
+    'supports' => ['title', 'editor', 'thumbnail'],
+    'show_in_rest' => true, 'exclude_from_search' => false,
+]);
+
+// Or from /admin/?page=content-types
+```
+
+### Custom Taxonomies
+```php
+cr_save_content_taxonomy([
+    'name' => 'brand', 'label' => 'Brands',
+    'hierarchical' => true, 'post_types' => ['product'],
+]);
+```
+
+### Field Groups (ACF-style)
+```php
+cr_save_field_group([
+    'name' => 'product-details', 'label' => 'Product Details',
+    'location_rules' => [
+        ['param' => 'post_type', 'operator' => '==', 'value' => 'product'],
+    ],
+]);
+```
+Groups display as collapsible panels in the post editor, only on matching post types.
+
+### Meta Fields with Conditional Logic
+```php
+cr_save_meta_field([
+    'name' => 'weight', 'label' => 'Weight (kg)',
+    'field_type' => 'number', 'post_type' => 'product',
+    'conditional_logic' => [
+        'relation' => 'and',
+        'rules' => [['field' => 'product_type', 'operator' => '==', 'value' => 'physical']],
+    ],
+]);
+```
+9 operators: `==`, `!=`, `>`, `<`, `>=`, `<=`, `contains`, `empty`, `not_empty`. AND/OR logic. Client-side JS toggle + server-side validation (hidden fields skipped on save).
+
+### Repeater Fields
+```php
+cr_save_meta_field([
+    'name' => 'features', 'label' => 'Features', 'field_type' => 'repeater',
+    'options' => [
+        'sub_fields' => [
+            ['name' => 'title', 'label' => 'Title', 'field_type' => 'text'],
+            ['name' => 'desc', 'label' => 'Description', 'field_type' => 'textarea'],
+        ],
+        'min_rows' => 1, 'max_rows' => 20, 'button_label' => 'Add Feature',
+    ],
+]);
+```
+Stored as JSON array in postmeta. JS add/remove rows with template cloning.
+
+### 16 Field Types
+`text`, `textarea`, `number`, `email`, `url`, `tel`, `date`, `datetime`, `time`, `select`, `radio`, `checkbox`, `color`, `range`, `image`, `wysiwyg`, `repeater`
+
+---
+
+## Admin Panel
+
+20+ pages covering every backend feature:
+
+| Section | Pages |
+|---|---|
+| Content | Posts, Pages, Media, [Custom Types] |
+| Classification | Categories, Tags, Comments |
+| Structure | Content Types, Taxonomies, Field Groups, Meta Fields |
+| Access | Users (CRUD, roles, passwords), Plugins, Themes |
+| AI | AI Settings (providers, keys), Guidelines (editorial), Vector Search (embeddings, reindex) |
+| System | Queue Monitor (jobs, retry, dead letter), Security (rate limits), Settings (general, reading, date, permalinks) |
 
 ---
 
@@ -804,7 +904,7 @@ Base URL: `/mcp/`
 
 ## Database Schema
 
-13 tables with configurable prefix (default `cr_`):
+16 tables with configurable prefix (default `cr_`):
 
 | Table | Purpose | Key Columns |
 |---|---|---|
@@ -821,6 +921,10 @@ Base URL: `/mcp/`
 | `cr_options` | Site settings | option_name (unique), option_value, autoload |
 | `cr_json_meta` | JSON metadata | object_type, object_id, meta (JSON column) |
 | `cr_queue` | Async job queue | hook, args, status, priority, scheduled_at |
+| `cr_content_types` | Custom content types | name, label, supports (JSON), show_in_rest |
+| `cr_content_taxonomies` | Custom taxonomies | name, label, hierarchical, post_types (JSON) |
+| `cr_meta_fields` | Meta field definitions | name, field_type, post_type, conditional_logic (JSON) |
+| `cr_field_groups` | Field groups | name, label, location_rules (JSON), position |
 
 ---
 
@@ -855,12 +959,15 @@ Creates an isolated `cleanroom_test` database, seeds test data, runs all suites,
 | LRU Cache + Namespaced Options | 25 | Integration |
 | Security System | 32 | Integration |
 | Async Queue System | 24 | Integration |
+| Content Builder | 60 | Integration |
+| Field Groups + Conditions + Repeaters | 45 | Integration |
 | AI Client SDK | 40 | Integration |
 | Abilities API | 39 | Integration |
 | Content Guidelines | 24 | Integration |
 | MCP Adapter | 33 | Integration |
+| Vector Search Integration | 31 | Integration |
 | REST API | 34 | API |
-| **Total** | **585** | |
+| **Total** | **721** | |
 
 ---
 
