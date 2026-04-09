@@ -446,9 +446,7 @@ function cr_admin_header(string $current_page): void {
         $ve_pto = get_post_type_object($ve_type);
         if ($ve_pto && in_array('editor', (array) ($ve_pto->supports ?? []))) {
     ?>
-    <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/vendor/vanillabuilder/vanillabuilder.css">
     <link rel="stylesheet" href="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/css/visual-editor.css">
-    <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/vendor/vanillabuilder/vanillabuilder.js" defer></script>
     <script src="<?php echo esc_url(CR_SITE_URL); ?>/admin/assets/js/visual-editor.js" defer></script>
     <?php } } ?>
 </head>
