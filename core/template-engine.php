@@ -121,13 +121,84 @@ function cr_render_block_template(string $template_name): string {
     $context = cr_build_template_context();
     $html = cr_render_blocks($blocks, $context);
 
-    // Inject template CSS
+    // Inject template-specific CSS
     $css = $template->css ?? '';
     if ($css) {
-        $html = '<style>' . strip_tags($css) . '</style>' . "\n" . $html;
+        $html = '<style id="template-css">' . strip_tags($css) . '</style>' . "\n" . $html;
+    }
+
+    // Auto-wrap with HTML document if no html-wrapper block present
+    $has_wrapper = false;
+    foreach ($blocks as $b) {
+        if (($b['type'] ?? '') === 'html-wrapper') { $has_wrapper = true; break; }
+    }
+
+    if (!$has_wrapper) {
+        $html = cr_wrap_with_html_document($html, $context);
     }
 
     return $html;
+}
+
+/**
+ * Wrap block output with a complete HTML document (head, styles, scripts).
+ */
+function cr_wrap_with_html_document(string $body_html, array $context): string {
+    $lang = get_option('cr_locale', 'en-US');
+    $site_name = esc_html($context['site_name'] ?? '');
+    $page_title = $site_name;
+    if ($context['post'] ?? null) {
+        $page_title = esc_html($context['post']->post_title ?? '') . ' — ' . $site_name;
+    }
+
+    $theme_css = esc_url(cr_get_theme_url() . '/style.css');
+
+    // Build <head>
+    $head = '<!DOCTYPE html>' . "\n";
+    $head .= '<html lang="' . esc_attr($lang) . '">' . "\n";
+    $head .= '<head>' . "\n";
+    $head .= '<meta charset="UTF-8">' . "\n";
+    $head .= '<meta name="viewport" content="width=device-width, initial-scale=1.0">' . "\n";
+    $head .= '<title>' . $page_title . '</title>' . "\n";
+    $head .= '<link rel="stylesheet" href="' . $theme_css . '">' . "\n";
+
+    // Fire cr_head() to output enqueued styles/scripts
+    ob_start();
+    cr_head();
+    $head .= ob_get_clean();
+
+    // Post-specific visual editor CSS
+    global $cr_post;
+    if ($cr_post) {
+        $post_css = get_post_meta((int) $cr_post->ID, '_post_css', true);
+        if ($post_css) {
+            $head .= '<style id="post-visual-css">' . strip_tags($post_css) . '</style>' . "\n";
+        }
+    }
+
+    $head .= '</head>' . "\n";
+
+    // Build body classes
+    $body_classes = [];
+    if ($context['is_home'] ?? false) $body_classes[] = 'home';
+    if ($context['is_single'] ?? false) $body_classes[] = 'single';
+    if ($context['is_page'] ?? false) $body_classes[] = 'page';
+    if ($context['is_archive'] ?? false) $body_classes[] = 'archive';
+    if ($context['is_search'] ?? false) $body_classes[] = 'search';
+    if ($context['is_404'] ?? false) $body_classes[] = 'error404';
+    if (is_user_logged_in()) $body_classes[] = 'logged-in';
+    $body_class = implode(' ', $body_classes);
+
+    $head .= '<body class="' . esc_attr($body_class) . '">' . "\n";
+
+    // Footer
+    $foot = "\n";
+    ob_start();
+    cr_footer();
+    $foot .= ob_get_clean();
+    $foot .= '</body></html>';
+
+    return $head . $body_html . $foot;
 }
 
 function cr_render_blocks(array $blocks, array $context): string {

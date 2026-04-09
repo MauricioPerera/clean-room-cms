@@ -145,7 +145,11 @@ function cr_admin_template_builder(): void {
                 </div>
 
                 <div class="structure-footer">
-                    <p class="field-desc">Click a block on the left to add it. Click a block in the tree to configure it. Drag to reorder.</p>
+                    <details class="css-editor-details">
+                        <summary>Custom CSS</summary>
+                        <textarea name="template_css" rows="8" class="input-full" style="font-family:'SF Mono','Cascadia Code',monospace;font-size:.85em" placeholder="/* Custom styles for this template */&#10;.entry-title { font-size: 2em; }&#10;.entry-content { line-height: 1.8; }"><?php echo esc_html($current->css ?? ''); ?></textarea>
+                    </details>
+                    <p class="field-desc">Click a block on the left to add it. Click a block in the tree to configure it.</p>
                 </div>
             </form>
         </div>
