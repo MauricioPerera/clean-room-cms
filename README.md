@@ -302,7 +302,8 @@ Admin E2E suites verify every page renders, every form saves correctly, every ac
 
 ## Documentation
 
-Full API reference and system documentation: **[DOCS.md](DOCS.md)**
+- System documentation and API reference: **[DOCS.md](DOCS.md)**
+- Theme development guide: **[THEMES.md](THEMES.md)**
 
 ---
 
