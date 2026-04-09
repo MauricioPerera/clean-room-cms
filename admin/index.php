@@ -10,6 +10,7 @@ require_once __DIR__ . '/pages/plugins.php';
 require_once __DIR__ . '/pages/ai-settings.php';
 require_once __DIR__ . '/pages/queue.php';
 require_once __DIR__ . '/pages/settings.php';
+require_once __DIR__ . '/pages/api-docs.php';
 
 // Auth check
 if (!is_user_logged_in()) {
@@ -376,6 +377,7 @@ function cr_admin_page(string $page): void {
         'vector-settings'        => fn() => cr_admin_vector_settings(),
         'queue'                  => fn() => cr_admin_queue_monitor(),
         'security'               => fn() => cr_admin_security_settings(),
+        'api-docs'               => fn() => cr_admin_api_docs(),
         'comments'               => fn() => cr_admin_comments(),
         'media'                  => fn() => cr_admin_media(),
         'field-groups'           => fn() => cr_admin_field_groups_list(),
@@ -459,6 +461,7 @@ function cr_admin_header(string $current_page): void {
             <a href="?page=guidelines" class="<?php echo $current_page === 'guidelines' ? 'active' : ''; ?>">Guidelines</a>
             <a href="?page=vector-settings" class="<?php echo $current_page === 'vector-settings' ? 'active' : ''; ?>">Vector Search</a>
             <div class="nav-separator"></div>
+            <a href="?page=api-docs" class="<?php echo $current_page === 'api-docs' ? 'active' : ''; ?>">API Docs</a>
             <a href="?page=queue" class="<?php echo $current_page === 'queue' ? 'active' : ''; ?>">Queue</a>
             <a href="?page=security" class="<?php echo $current_page === 'security' ? 'active' : ''; ?>">Security</a>
             <a href="?page=settings" class="<?php echo $current_page === 'settings' ? 'active' : ''; ?>">Settings</a>
