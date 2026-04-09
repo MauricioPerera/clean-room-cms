@@ -123,6 +123,7 @@ function cr_admin_security_settings(): void {
 }
 
 function cr_admin_save_security(): void {
+    if (!current_user_can('manage_options')) return;
     update_option('cr_api_rate_limit_val', (int) ($_POST['api_rate_limit'] ?? 100), 'no');
     update_option('cr_login_rate_limit_val', (int) ($_POST['login_limit'] ?? 5), 'no');
     update_option('cr_login_rate_window_val', (int) ($_POST['login_window'] ?? 300), 'no');
@@ -302,7 +303,7 @@ function cr_admin_upload_media(): void {
         'post_content'   => '',
         'post_status'    => 'inherit',
         'post_type'      => 'attachment',
-        'post_mime_type' => $file['type'],
+        'post_mime_type' => $actual_type,
         'post_author'    => get_current_user_id(),
         'guid'           => $url,
     ]);

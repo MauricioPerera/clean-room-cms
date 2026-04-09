@@ -93,6 +93,7 @@ function cr_admin_settings_full(): void {
 }
 
 function cr_admin_save_settings_full(): void {
+    if (!current_user_can('manage_options')) return;
     $fields = [
         'blogname', 'blogdescription', 'admin_email',
         'posts_per_page', 'show_on_front', 'page_on_front',

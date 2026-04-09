@@ -31,7 +31,7 @@ function cr_admin_ai_settings(): void {
             <h2>OpenAI</h2>
             <div class="form-group">
                 <label>API Key</label>
-                <input type="password" name="openai_api_key" value="<?php echo esc_attr($connectors['openai']['api_key'] ?? ''); ?>" class="input-full" placeholder="sk-...">
+                <input type="password" name="openai_api_key" placeholder="<?php echo !empty($connectors['openai']['api_key']) ? '•••• (saved)' : 'sk-...'; ?>" class="input-full">
             </div>
             <label class="checkbox-label"><input type="checkbox" name="openai_enabled" value="1" <?php echo ($connectors['openai']['enabled'] ?? false) ? 'checked' : ''; ?>> Enabled</label>
         </div>
@@ -40,7 +40,7 @@ function cr_admin_ai_settings(): void {
             <h2>Anthropic</h2>
             <div class="form-group">
                 <label>API Key</label>
-                <input type="password" name="anthropic_api_key" value="<?php echo esc_attr($connectors['anthropic']['api_key'] ?? ''); ?>" class="input-full" placeholder="sk-ant-...">
+                <input type="password" name="anthropic_api_key" placeholder="<?php echo !empty($connectors['anthropic']['api_key']) ? '•••• (saved)' : 'sk-ant-...'; ?>" class="input-full">
             </div>
             <label class="checkbox-label"><input type="checkbox" name="anthropic_enabled" value="1" <?php echo ($connectors['anthropic']['enabled'] ?? false) ? 'checked' : ''; ?>> Enabled</label>
         </div>
@@ -71,14 +71,19 @@ function cr_admin_ai_settings(): void {
 }
 
 function cr_admin_save_ai_settings(): void {
+    if (!current_user_can('manage_options')) return;
+
+    // Preserve existing API keys if fields are empty (masked in form)
+    $existing = get_option('cr_ai_connectors', []);
+
     $connectors = [
         'openai' => [
             'enabled'  => isset($_POST['openai_enabled']),
-            'api_key'  => $_POST['openai_api_key'] ?? '',
+            'api_key'  => !empty($_POST['openai_api_key']) ? $_POST['openai_api_key'] : ($existing['openai']['api_key'] ?? ''),
         ],
         'anthropic' => [
             'enabled'  => isset($_POST['anthropic_enabled']),
-            'api_key'  => $_POST['anthropic_api_key'] ?? '',
+            'api_key'  => !empty($_POST['anthropic_api_key']) ? $_POST['anthropic_api_key'] : ($existing['anthropic']['api_key'] ?? ''),
         ],
         'ollama' => [
             'enabled'  => isset($_POST['ollama_enabled']),
@@ -137,6 +142,7 @@ function cr_admin_guidelines(): void {
 }
 
 function cr_admin_save_guidelines(): void {
+    if (!current_user_can('manage_options')) return;
     $data = [];
     foreach (['site', 'copy', 'images', 'blocks', 'additional'] as $key) {
         $data[$key] = trim($_POST['guideline_' . $key] ?? '');
@@ -211,6 +217,7 @@ function cr_admin_vector_settings(): void {
 }
 
 function cr_admin_save_vector_settings(): void {
+    if (!current_user_can('manage_options')) return;
     update_option('cr_vector_embed_provider', $_POST['embed_provider'] ?? 'openai', 'no');
     update_option('cr_vector_embed_model', $_POST['embed_model'] ?? 'text-embedding-3-small', 'no');
     update_option('cr_vector_dimensions', (int) ($_POST['dimensions'] ?? 1536), 'no');
