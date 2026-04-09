@@ -3,7 +3,7 @@
 Modern content management system built from scratch using [clean-room design](https://en.wikipedia.org/wiki/Clean-room_design) methodology. Every line is original. Zero external dependencies.
 
 ```
-79 PHP files · 21,802 lines · 721 tests · 27 suites · 0 dependencies · PHP 8.2+
+80 PHP files · 22,312 lines · 846 tests · 31 suites · 0 dependencies · PHP 8.2+
 ```
 
 ---
@@ -17,7 +17,7 @@ Most CMS platforms carry decades of technical debt, full-trust plugin models, an
 - **Plugin sandboxing** — 17 granular permissions per plugin, declared in `manifest.json`, admin-approved
 - **AI-native** — provider-agnostic AI client, Abilities API, Content Guidelines, MCP server, vector search + RAG
 - **Security built-in** — CSP nonces, rate limiting, brute force protection, HMAC cookies, CSRF nonces on all actions
-- **721 tests** — every public function verified, 27 suites, 100% pass rate, 2 security audits passed
+- **846 tests** — every function verified including admin UI, 31 suites, 100% pass rate, 2 security audits
 
 ---
 
@@ -283,9 +283,12 @@ Creates isolated `cleanroom_test` database, seeds data, runs all suites, drops d
 | Category | Suites | Assertions |
 |---|---|---|
 | Unit (no DB) | 6 | 83 |
-| Integration | 20 | 604 |
+| Integration (core) | 20 | 604 |
+| Admin E2E | 4 | 125 |
 | API | 1 | 34 |
-| **Total** | **27** | **721** |
+| **Total** | **31** | **846** |
+
+Admin E2E suites verify every page renders, every form saves correctly, every action handler works — users, roles, plugins, themes, settings, AI config, guidelines, vectors, queue, security, comments, media, and API docs with dynamic content type reflection.
 
 ---
 

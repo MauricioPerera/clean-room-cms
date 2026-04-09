@@ -96,7 +96,7 @@ clean room/
     schema.sql                  Database schema (17 tables)
     installer.php               Web-based installation wizard
 
-  tests/                        721 assertions across 27 suites
+  tests/                        846 assertions across 31 suites
     run.php                     Test runner (standalone, no dependencies)
     TestCase.php                Assertion library
     bootstrap.php               Test environment setup and teardown
@@ -111,14 +111,14 @@ clean room/
 
 | Metric | Value |
 |--------|-------|
-| PHP files | 79 |
+| PHP files | 80 |
 | Lines of code (core + AI) | 8,500+ |
-| Lines of code (admin) | 3,600+ |
-| Lines of code (tests) | 3,562 |
+| Lines of code (admin) | 3,800+ |
+| Lines of code (tests) | 4,000+ |
 | Lines of code (vendor) | 2,809 |
-| Lines of code (total) | 21,802 |
-| Test suites | 27 |
-| Test assertions | 721 |
+| Lines of code (total) | 22,312 |
+| Test suites | 31 |
+| Test assertions | 846 |
 | Pass rate | 100% |
 | Security audits passed | 2 (34 issues found + fixed) |
 | External dependencies | 0 |
@@ -1002,8 +1002,14 @@ Creates an isolated `cleanroom_test` database, seeds test data, runs all suites,
 | Content Guidelines | 24 | Integration |
 | MCP Adapter | 33 | Integration |
 | Vector Search Integration | 31 | Integration |
+| Admin E2E: Users + Roles + Profile Fields | 40 | E2E |
+| Admin E2E: Plugins + Themes | 20 | E2E |
+| Admin E2E: Settings + AI + Guidelines + Vectors | 29 | E2E |
+| Admin E2E: Comments + Media + Queue + Security + API Docs | 36 | E2E |
 | REST API | 34 | API |
-| **Total** | **721** | |
+| **Total** | **846** | |
+
+Admin E2E tests verify every admin page renders correctly, every form handler saves data, every action handler (delete, approve, activate, deactivate) works, and the API documentation page reflects dynamic content types and meta fields in real-time.
 
 ---
 
