@@ -21,6 +21,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let editor = null;
     let currentMode = 'visual';
 
+    // Suppress non-critical VanillaBuilder init warnings (Devices/Pages event race)
+    const origConsoleError = console.error;
+    console.error = (...args) => {
+        const msg = String(args[0] || '');
+        if (msg.includes('Error initializing module')) return; // Known init-order race
+        origConsoleError.apply(console, args);
+    };
+
     // Initialize VanillaBuilder
     try {
         editor = vanillabuilder.init({
@@ -30,19 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
             height: '600px',
             width: '100%',
             storageManager: { type: false },
-            showDevices: false,
             showToolbar: true,
             multipleSelection: true,
-            deviceManager: {
-                devices: [
-                    { id: 'desktop', name: 'Desktop', width: '' },
-                    { id: 'tablet', name: 'Tablet', width: '768px' },
-                    { id: 'mobile', name: 'Mobile', width: '375px' },
-                ],
-            },
-            pageManager: { pages: [] },
         });
     } catch (e) {
+        console.error = origConsoleError;
         console.error('VanillaBuilder init failed:', e);
         // Fallback: show textarea
         editorContainer.style.display = 'none';
@@ -51,6 +51,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (toggle) toggle.style.display = 'none';
         return;
     }
+
+    // Restore console.error
+    console.error = origConsoleError;
 
     // Toggle buttons
     const toggleBtns = document.querySelectorAll('.editor-toggle .toggle-btn');

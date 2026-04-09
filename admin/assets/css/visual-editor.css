@@ -46,6 +46,17 @@
     background: #fff;
 }
 
+/* Ensure VanillaBuilder canvas has white background */
+#vanillabuilder-editor .vb-editor {
+    background: #fff;
+}
+#vanillabuilder-editor .vb-editor-canvas-wrap {
+    background: #fff;
+}
+#vanillabuilder-editor iframe {
+    background: #fff;
+}
+
 /* Hide textarea when visual editor is active */
 .editor-hidden {
     display: none !important;
